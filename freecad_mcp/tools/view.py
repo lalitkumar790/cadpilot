@@ -31,23 +31,13 @@ def save_document(filename: str | None = None) -> str:
 @mcp_server.tool()
 def export_step(object_name: str, filename: str) -> str:
     """Export an object to a STEP file (.step / .stp)."""
-    return dispatch("execute_python", code=(
-        "import Part, FreeCAD\n"
-        f"obj = FreeCAD.ActiveDocument.getObject({object_name!r})\n"
-        f"Part.export([obj], {filename!r})\n"
-        f"'Exported {{}} to {filename}'.format(obj.Name) if obj else 'Object not found'"
-    ))
+    return dispatch("export_step", object_name=object_name, filename=filename)
 
 
 @mcp_server.tool()
 def export_stl(object_name: str, filename: str) -> str:
     """Export an object to an STL file, e.g. for 3D printing."""
-    return dispatch("execute_python", code=(
-        "import Mesh, FreeCAD\n"
-        f"obj = FreeCAD.ActiveDocument.getObject({object_name!r})\n"
-        f"Mesh.export([obj], {filename!r})\n"
-        f"'Exported {{}} to {filename}'.format(obj.Name) if obj else 'Object not found'"
-    ))
+    return dispatch("export_stl", object_name=object_name, filename=filename)
 
 
 @mcp_server.tool()
