@@ -76,18 +76,20 @@ class GlobalAIService:
 
         FreeCAD.Console.PrintMessage("🔄 Stopping AI Copilot Service...\\n")
         errors = []
+        socket_server = self.socket_server
+        event_observer = self.event_observer
 
-        if self.socket_server:
+        if socket_server:
             try:
-                self.socket_server.stop_server()
+                socket_server.stop_server()
             except Exception as e:
                 errors.append(f"Socket server shutdown error: {e}")
             finally:
                 self.socket_server = None
 
-        if self.event_observer:
+        if event_observer:
             try:
-                self.event_observer.stop()
+                event_observer.stop()
             except Exception as e:
                 errors.append(f"Event observer shutdown error: {e}")
             finally:
@@ -95,20 +97,12 @@ class GlobalAIService:
 
         self.is_running = False
 
-        # Remove only references that still point to this service's resources.
         for attribute, resource in (
-            ("__ai_socket_server", None),
-            ("__ai_observer", None),
+            ("__ai_socket_server", socket_server),
+            ("__ai_observer", event_observer),
             ("__ai_global_service", self),
         ):
-            if hasattr(FreeCAD, attribute):
-                current = getattr(FreeCAD, attribute)
-                if attribute == "__ai_global_service" and current is not self:
-                    continue
-                if attribute == "__ai_socket_server" and current is not None:
-                    continue
-                if attribute == "__ai_observer" and current is not None:
-                    continue
+            if resource is not None and getattr(FreeCAD, attribute, None) is resource:
                 try:
                     delattr(FreeCAD, attribute)
                 except Exception as e:
