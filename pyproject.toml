@@ -1,0 +1,22 @@
+[project]
+name = "cadpilot-freecad-mcp"
+version = "3.1.0"
+description = "CADPilot: local MCP bridge connecting Claude Desktop to FreeCAD for AI-assisted CAD modelling"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=2.0.0,<3.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+freecad-mcp = "freecad_mcp.main:run"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["freecad_mcp*"]

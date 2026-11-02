@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "freecad": {
+      "command": "C:/FULL/PATH/TO/cadpilot/.venv/Scripts/python.exe",
+      "args": [
+        "-m",
+        "freecad_mcp.main"
+      ],
+      "cwd": "C:/FULL/PATH/TO/cadpilot"
+    }
+  }
+}
