@@ -76,6 +76,21 @@ if (-not $SkipFreeCADAddon) {
     } else {
         $ModRoot = (Resolve-Path -LiteralPath $FreeCADModDirectory).Path
     }
+    $AddonSource = Join-Path $RepoRoot "AICopilot"
+    $RequiredAddonFiles = @(
+        "InitGui.py",
+        "socket_server.py",
+        "security_policy.py",
+        "request_validation.py",
+        "export_validation.py"
+    )
+    foreach ($RequiredFile in $RequiredAddonFiles) {
+        $SourceFile = Join-Path $AddonSource $RequiredFile
+        if (-not (Test-Path -LiteralPath $SourceFile -PathType Leaf)) {
+            throw "Required FreeCAD add-on file is missing: $SourceFile. Re-download or re-extract the complete CADPilot repository."
+        }
+    }
+
     $AddonTarget = Join-Path $ModRoot "AICopilot"
     New-Item -ItemType Directory -Force -Path $ModRoot | Out-Null
 
@@ -86,8 +101,14 @@ if (-not $SkipFreeCADAddon) {
         Move-Item -Path $AddonTarget -Destination $Backup
     }
 
-    Copy-Item -Path (Join-Path $RepoRoot "AICopilot") -Destination $AddonTarget -Recurse -Force
-    Write-Host "Installed FreeCAD workbench: $AddonTarget" -ForegroundColor Green
+    Copy-Item -Path $AddonSource -Destination $AddonTarget -Recurse -Force
+    foreach ($RequiredFile in $RequiredAddonFiles) {
+        $InstalledFile = Join-Path $AddonTarget $RequiredFile
+        if (-not (Test-Path -LiteralPath $InstalledFile -PathType Leaf)) {
+            throw "Add-on installation verification failed; missing: $InstalledFile"
+        }
+    }
+    Write-Host "Verified FreeCAD workbench files: $AddonTarget" -ForegroundColor Green
 }
 
 if (-not $SkipClaudeConfig) {
