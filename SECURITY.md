@@ -14,6 +14,7 @@ This project bridges an AI assistant to a locally running CAD application.
 
 - `delete_object` removes geometry from the active document.
 - `save_document` and export tools write files.
+- STEP/STL exports require an existing destination directory, reject control characters and unsupported extensions, and refuse to overwrite an existing file. Choose a new filename when exporting again.
 - `run_python` executes arbitrary Python inside FreeCAD.
 
 In this student edition, arbitrary Python execution is disabled by default at **both ends**: the MCP tool wrapper checks the MCP server process environment, and the FreeCAD socket server independently checks the FreeCAD process environment before resolving `execute_python`. To enable it, set `FREECAD_MCP_ENABLE_PYTHON_EXEC=1` in **both** process environments and restart both applications. Setting it only for Claude Desktop/MCP does not enable execution inside FreeCAD; a raw local socket request is also rejected unless FreeCAD itself opted in. This is a guardrail, not a sandbox. If enabled, code runs with the permissions of the logged-in user.
