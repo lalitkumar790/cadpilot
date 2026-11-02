@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from datetime import datetime
 
 
 def main() -> int:
@@ -54,7 +55,17 @@ def main() -> int:
         "args": ["-m", "freecad_mcp.main"],
         "cwd": str(repo_root),
     }
-    config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+
+    if config_path.exists():
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        backup_path = config_path.with_name(f"claude_desktop_config.backup-{stamp}.json")
+        backup_path.write_bytes(config_path.read_bytes())
+        print(f"Backed up previous Claude config: {backup_path}")
+
+    temp_path = config_path.with_suffix(".json.tmp")
+    temp_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    temp_path.replace(config_path)
+
     print(f"Updated Claude Desktop config: {config_path}")
     print(f"Project folder: {repo_root}")
     print(f"Python executable: {python_exe}")
