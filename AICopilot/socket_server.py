@@ -13,6 +13,7 @@ import queue
 import platform
 from typing import Dict, Any, List, Optional
 from PySide import QtCore
+from security_policy import python_execution_enabled
 
 # Platform-specific socket handling
 IS_WINDOWS = platform.system() == "Windows"
@@ -526,6 +527,15 @@ class FreeCADSocketServer:
         elif tool_name == "export_stl":
             return functools.partial(self._export_stl, args)
         elif tool_name == "execute_python":
+            # Enforce the opt-in inside FreeCAD as well as in the MCP bridge.
+            # The local socket is unauthenticated, so callers can bypass the
+            # MCP tool wrapper and send raw commands directly.
+            if not python_execution_enabled():
+                return lambda: (
+                    "Error: execute_python is disabled in the FreeCAD process. "
+                    "Set FREECAD_MCP_ENABLE_PYTHON_EXEC=1 before launching FreeCAD "
+                    "only if you understand the risks."
+                )
             return functools.partial(self._execute_python, args)
         
         # Legacy individual tool routing (for backward compatibility)
