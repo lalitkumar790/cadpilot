@@ -132,6 +132,17 @@ jobs:
           if ($backups.Count -ne 1) { throw "Expected exactly one previous add-on backup; found $($backups.Count)." }
           if (-not (Test-Path -LiteralPath (Join-Path $backups[0].FullName "old-marker.txt"))) { throw "Previous add-on backup did not preserve its contents." }
 
+          # A second rapid update must create another distinct backup rather
+          # than collide with or overwrite the first backup.
+          & (Join-Path $scripts "setup_windows.ps1") -FreeCADModDirectory $modRoot -SkipPythonSetup -SkipClaudeConfig
+          $backupsAfterSecondUpdate = @(Get-ChildItem -LiteralPath $modRoot -Directory -Filter "AICopilot.backup-*")
+          if ($backupsAfterSecondUpdate.Count -ne 2) { throw "Expected two distinct backups after two updates; found $($backupsAfterSecondUpdate.Count)." }
+          if (@($backupsAfterSecondUpdate.Name | Select-Object -Unique).Count -ne 2) { throw "Repeated installer runs produced colliding backup names." }
+          if (-not (Test-Path -LiteralPath (Join-Path $backupsAfterSecondUpdate[1].FullName "InitGui.py"))) {
+            $secondBackupHasInstalledFiles = @($backupsAfterSecondUpdate | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "InitGui.py") }).Count -gt 0
+            if (-not $secondBackupHasInstalledFiles) { throw "Second backup did not preserve the previously installed add-on." }
+          }
+
           # Preflight failure: an incomplete source must be rejected before
           # the currently installed add-on is moved or modified.
           Remove-Item -LiteralPath $target -Recurse -Force
@@ -148,7 +159,7 @@ jobs:
           if (-not $rejected) { throw "Installer accepted an incomplete add-on source." }
           if (-not (Test-Path -LiteralPath (Join-Path $target "live-marker.txt"))) { throw "Installed add-on was modified after preflight rejection." }
           $backupCountAfterFailure = @(Get-ChildItem -LiteralPath $modRoot -Directory -Filter "AICopilot.backup-*").Count
-          if ($backupCountAfterFailure -ne 1) { throw "Preflight failure unexpectedly changed backup state." }
+          if ($backupCountAfterFailure -ne 2) { throw "Preflight failure unexpectedly changed backup state." }
           Write-Host "Windows installer success and preflight-preservation checks passed."
 
       - name: Verify default FreeCAD profile version selection
