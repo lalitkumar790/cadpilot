@@ -31,7 +31,7 @@ Do not put the whole repository inside FreeCAD's `Mod` folder.
 powershell -ExecutionPolicy Bypass -File .\scripts\setup_windows.ps1
 ```
 
-The installer creates a Python environment in `.venv`, installs CADPilot's dependencies, copies only the `AICopilot` add-on into FreeCAD's user `Mod` folder, and adds the `freecad` MCP server to Claude Desktop's configuration. Existing Claude MCP entries are preserved, and the previous Claude config is backed up before it is changed.
+The installer creates a Python environment in `.venv`, installs CADPilot's dependencies, copies only the `AICopilot` add-on into FreeCAD's user `Mod` folder, and adds the `freecad` MCP server to Claude Desktop's configuration. Existing Claude MCP entries are preserved, and the previous Claude config is backed up before it is changed. If an existing FreeCAD add-on is present, the installer backs it up first and restores it automatically if copying or post-copy verification fails.
 
 ### If the add-on installs to the wrong FreeCAD profile
 
