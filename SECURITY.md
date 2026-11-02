@@ -18,6 +18,13 @@ This project bridges an AI assistant to a locally running CAD application.
 
 In this student edition, `run_python` is disabled unless `FREECAD_MCP_ENABLE_PYTHON_EXEC=1` is explicitly set in the MCP server environment. This is a guardrail, not a sandbox. If enabled, code runs with the permissions of the logged-in user.
 
+## Local socket protocol and resource limits
+
+- The TCP listener is bound to the loopback interface (`127.0.0.1`/`localhost`) on Windows; Unix-like systems use a local domain socket.
+- The bridge sends one newline-delimited JSON request per connection. The FreeCAD listener also accepts a complete legacy JSON request without a newline during upgrades.
+- Requests and responses are limited to 8 MiB by the bridge. Socket operations use finite timeouts.
+- The socket is still unauthenticated. Loopback binding reduces network exposure but does not protect against other processes running as the same user or malware on the machine.
+
 ## Recommendations
 
 1. Keep the default `run_python` setting disabled.
