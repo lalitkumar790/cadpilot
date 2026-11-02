@@ -57,6 +57,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          # The malformed-config scenario intentionally expects a nonzero native process exit.
+          $PSNativeCommandUseErrorActionPreference = $false
           $testRoot = Join-Path $env:RUNNER_TEMP "cadpilot-uninstall-test"
           if (Test-Path -LiteralPath $testRoot) {
             Remove-Item -LiteralPath $testRoot -Recurse -Force
