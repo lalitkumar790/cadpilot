@@ -27,3 +27,29 @@ jobs:
         run: python -m compileall -q AICopilot freecad_mcp scripts
       - name: Run tests
         run: python -m pytest -q
+
+  windows-script-validation:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse Windows setup and uninstall scripts
+        shell: pwsh
+        run: |
+          $files = @(
+            "scripts/setup_windows.ps1",
+            "scripts/uninstall_windows.ps1"
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Join-Path $PWD $file),
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_.ToString() }
+              exit 1
+            }
+            Write-Host "PowerShell syntax OK: $file"
+          }
