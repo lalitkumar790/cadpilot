@@ -17,12 +17,9 @@ if (-not [string]::IsNullOrWhiteSpace($FreeCADModDirectory)) {
     $VersionedRoots = @()
     if (Test-Path -LiteralPath $FreeCADRoot -PathType Container) {
         $VersionedRoots = @(Get-ChildItem -LiteralPath $FreeCADRoot -Directory -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -match '^v(\d+)-(\d+)$' } |
-            Sort-Object @{
-                Expression = { [int]([regex]::Match($_.Name, '^v(\d+)-(\d+)$').Groups[1].Value) }
-                Descending = $true
-            }, @{
-                Expression = { [int]([regex]::Match($_.Name, '^v(\d+)-(\d+)$').Groups[2].Value) }
+            Where-Object { $_.Name -match '^v\d+-\d+$' } |
+            Sort-Object -Property @{
+                Expression = { [version](($_.Name -replace '^v', '') -replace '-', '.') }
                 Descending = $true
             })
     }
