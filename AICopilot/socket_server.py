@@ -15,6 +15,7 @@ from typing import Dict, Any, List, Optional
 from PySide import QtCore
 from security_policy import python_execution_enabled
 from request_validation import validate_command_payload
+from export_validation import validate_export_path
 
 # Platform-specific socket handling
 IS_WINDOWS = platform.system() == "Windows"
@@ -2339,16 +2340,10 @@ class FreeCADSocketServer:
         """Export a named document object to STEP without arbitrary Python."""
         import os
         try:
-            object_name, filename = args.get("object_name"), args.get("filename")
+            object_name = args.get("object_name")
             if not isinstance(object_name, str) or not object_name.strip():
                 return "Error: object_name must be a non-empty string"
-            if not isinstance(filename, str) or not filename.strip():
-                return "Error: filename must be a non-empty path"
-            if os.path.splitext(filename)[1].lower() not in {".step", ".stp"}:
-                return "Error: STEP filename must end in .step or .stp"
-            path = os.path.abspath(os.path.expanduser(filename))
-            if not os.path.isdir(os.path.dirname(path)):
-                return f"Error: export directory does not exist: {os.path.dirname(path)}"
+            path = validate_export_path(args.get("filename"), {".step", ".stp"})
             doc = FreeCAD.ActiveDocument
             if not doc:
                 return "Error: no active document"
@@ -2365,16 +2360,10 @@ class FreeCADSocketServer:
         """Export a named document object to STL without arbitrary Python."""
         import os
         try:
-            object_name, filename = args.get("object_name"), args.get("filename")
+            object_name = args.get("object_name")
             if not isinstance(object_name, str) or not object_name.strip():
                 return "Error: object_name must be a non-empty string"
-            if not isinstance(filename, str) or not filename.strip():
-                return "Error: filename must be a non-empty path"
-            if os.path.splitext(filename)[1].lower() != ".stl":
-                return "Error: STL filename must end in .stl"
-            path = os.path.abspath(os.path.expanduser(filename))
-            if not os.path.isdir(os.path.dirname(path)):
-                return f"Error: export directory does not exist: {os.path.dirname(path)}"
+            path = validate_export_path(args.get("filename"), {".stl"})
             doc = FreeCAD.ActiveDocument
             if not doc:
                 return "Error: no active document"
