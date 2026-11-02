@@ -57,6 +57,8 @@ FreeCADReActAgent = None  # Temporarily disabled
 # ---------------------------------------------------------------------------
 
 gui_task_queue: "queue.Queue" = queue.Queue()
+_gui_processor_generation = 0
+_gui_processor_active = False
 
 
 def _log(stage: str, detail: str = "") -> None:
@@ -70,11 +72,11 @@ def _log(stage: str, detail: str = "") -> None:
         pass
 
 
-def process_gui_tasks():
-    """Runs on the main Qt thread (scheduled via QTimer.singleShot). Drains
-    queued (func, result_queue, op_name) jobs and executes each one here,
-    on the GUI thread, catching any exception so it's returned to the
-    client instead of propagating and freezing/crashing FreeCAD."""
+def process_gui_tasks(generation=None):
+    """Drain GUI work for the current server lifecycle only."""
+    if not _gui_processor_active or generation != _gui_processor_generation:
+        return
+
     while not gui_task_queue.empty():
         try:
             func, result_queue, op_name, cancelled = gui_task_queue.get_nowait()
@@ -95,10 +97,25 @@ def process_gui_tasks():
         finally:
             gui_task_queue.task_done()
 
-    # Reschedule ourselves on the GUI thread. Polling interval unchanged
-    # from the original implementation (100ms) — this is the existing,
-    # legitimate cross-thread hand-off mechanism, not a new sleep/timeout.
-    QtCore.QTimer.singleShot(100, process_gui_tasks)
+    # Keep exactly one polling chain for the active server generation.
+    if _gui_processor_active and generation == _gui_processor_generation:
+        QtCore.QTimer.singleShot(100, lambda: process_gui_tasks(generation))
+
+
+def _start_gui_task_processor():
+    global _gui_processor_generation, _gui_processor_active
+    _gui_processor_generation += 1
+    generation = _gui_processor_generation
+    _gui_processor_active = True
+    QtCore.QTimer.singleShot(100, lambda: process_gui_tasks(generation))
+
+
+def _stop_gui_task_processor():
+    global _gui_processor_generation, _gui_processor_active
+    _gui_processor_active = False
+    # Invalidate any already-scheduled singleShot callback. A subsequent
+    # start receives a new generation and cannot be affected by stale timers.
+    _gui_processor_generation += 1
 
 
 def run_on_gui_thread(func, timeout: float = 20.0, op_name: str = "operation"):
@@ -300,6 +317,8 @@ class FreeCADSocketServer:
     def start_server(self):
         """Start the socket server (cross-platform)"""
         try:
+            if self.is_running:
+                return True
             if IS_WINDOWS:
                 # Use TCP socket on Windows
                 self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -336,8 +355,8 @@ class FreeCADSocketServer:
             )
             self._server_thread.start()
             
-            # Initialize GUI task processor
-            QtCore.QTimer.singleShot(100, process_gui_tasks)
+            # Start one GUI task polling chain for this server lifecycle.
+            _start_gui_task_processor()
             
             FreeCAD.Console.PrintMessage(f"Socket server started on {self.socket_path}\n")
             return True
@@ -3269,6 +3288,7 @@ class FreeCADSocketServer:
     def stop_server(self):
         """Stop the socket server"""
         self.is_running = False
+        _stop_gui_task_processor()
         
         # Closing the listening socket unblocks accept(); shutdown active clients
         # so their workers do not remain blocked in recv().
