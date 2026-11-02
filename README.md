@@ -123,7 +123,13 @@ Close FreeCAD and Claude Desktop, then run PowerShell from the project folder:
 powershell -ExecutionPolicy Bypass -File .\scripts\uninstall_windows.ps1
 ```
 
-This removes the CADPilot add-on and the `freecad` entry from Claude Desktop. It does not delete CAD documents, the project folder, or the Python environment.
+This removes the CADPilot add-on from the detected FreeCAD profile and the `freecad` entry from Claude Desktop. It does not delete CAD documents, the project folder, Python environment, or timestamped add-on backups. If you installed into a custom FreeCAD profile, pass its exact `Mod` directory:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\\scripts\\uninstall_windows.ps1 -FreeCADModDirectory "C:\\PATH\\TO\\FreeCAD\\Mod"
+```
+
+The uninstaller validates Claude's JSON before changing anything, backs up the config, and restores it if add-on removal fails.
 
 ## Developer tests
 
