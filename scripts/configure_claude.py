@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import sys
 from datetime import datetime
+import tempfile
 
 
 def main() -> int:
@@ -57,14 +58,37 @@ def main() -> int:
     }
 
     if config_path.exists():
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         backup_path = config_path.with_name(f"claude_desktop_config.backup-{stamp}.json")
         backup_path.write_bytes(config_path.read_bytes())
         print(f"Backed up previous Claude config: {backup_path}")
 
-    temp_path = config_path.with_suffix(".json.tmp")
-    temp_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
-    temp_path.replace(config_path)
+    # Create the temporary file beside the destination so os.replace stays
+    # on the same volume and is atomic. Unique names avoid collisions between
+    # concurrent setup runs; cleanup prevents abandoned partial config files.
+    temp_name = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="\n",
+            prefix="claude_desktop_config.",
+            suffix=".tmp",
+            dir=config_dir,
+            delete=False,
+        ) as temp_file:
+            temp_name = temp_file.name
+            temp_file.write(json.dumps(config, indent=2) + "\n")
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        os.replace(temp_name, config_path)
+        temp_name = None
+    finally:
+        if temp_name is not None:
+            try:
+                os.unlink(temp_name)
+            except FileNotFoundError:
+                pass
 
     print(f"Updated Claude Desktop config: {config_path}")
     print(f"Project folder: {repo_root}")
