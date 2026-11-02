@@ -22,19 +22,39 @@ class FreeCADEventObserver(QtCore.QObject):
         self._main_window = None
         
     def start(self):
-        """Start observing FreeCAD events"""
+        """Start observing FreeCAD events; repeated calls are harmless."""
+        if self._started:
+            return
         FreeCAD.Console.PrintMessage("Starting event observation...\\n")
-        
-        # Connect to selection observer
+
+        # Register each observer once and retain the window for teardown.
         FreeCADGui.Selection.addObserver(self)
-        
-        # Hook into document observer
         FreeCAD.addDocumentObserver(self)
-        
-        # Install event filter for mouse/keyboard
-        if FreeCADGui.getMainWindow():
-            FreeCADGui.getMainWindow().installEventFilter(self)
-            
+        self._main_window = FreeCADGui.getMainWindow()
+        if self._main_window:
+            self._main_window.installEventFilter(self)
+        self._started = True
+
+    def stop(self):
+        """Detach every FreeCAD/Qt observer; safe to call more than once."""
+        if not self._started:
+            return
+        try:
+            FreeCADGui.Selection.removeObserver(self)
+        except Exception:
+            pass
+        try:
+            FreeCAD.removeDocumentObserver(self)
+        except Exception:
+            pass
+        if self._main_window:
+            try:
+                self._main_window.removeEventFilter(self)
+            except Exception:
+                pass
+        self._main_window = None
+        self._started = False
+
     def onSelectionChanged(self, doc, obj, sub, pos):
         """Called when selection changes"""
         self.selection_history.append({
