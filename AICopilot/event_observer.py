@@ -18,6 +18,8 @@ class FreeCADEventObserver(QtCore.QObject):
         self.failed_attempts = deque(maxlen=50)
         self.time_tracking = {}
         self.current_operation_start = None
+        self._started = False
+        self._main_window = None
         
     def start(self):
         """Start observing FreeCAD events"""
