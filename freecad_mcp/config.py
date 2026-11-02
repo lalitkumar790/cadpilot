@@ -1,8 +1,5 @@
 """
-Configuration for the FreeCAD MCP bridge.
-
-Cross-platform socket settings used to talk to the AI Copilot workbench
-running inside FreeCAD.
+Configuration for the local FreeCAD MCP bridge.
 """
 from __future__ import annotations
 
@@ -13,13 +10,14 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class SocketConfig:
-    """Connection details for reaching the FreeCAD socket server."""
+    """Connection details and resource limits for the FreeCAD socket service."""
 
-    host: str = "localhost"
+    host: str = "127.0.0.1"
     port: int = 23456
     unix_socket_path: str = "/tmp/freecad_mcp.sock"
-    timeout_seconds: float = 15.0
-    recv_buffer_size: int = 65536  # generous buffer for screenshots / large payloads
+    timeout_seconds: float = 30.0
+    recv_buffer_size: int = 65536
+    max_message_bytes: int = 8 * 1024 * 1024
 
     @property
     def is_windows(self) -> bool:
@@ -28,8 +26,6 @@ class SocketConfig:
     def is_available(self) -> bool:
         """Best-effort availability check without opening a real connection."""
         if self.is_windows:
-            # On Windows we always attempt a TCP connection when needed;
-            # there is no cheap way to pre-check without connecting.
             return True
         return os.path.exists(self.unix_socket_path)
 
