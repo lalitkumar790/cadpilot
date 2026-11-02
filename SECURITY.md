@@ -16,7 +16,7 @@ This project bridges an AI assistant to a locally running CAD application.
 - `save_document` and export tools write files.
 - `run_python` executes arbitrary Python inside FreeCAD.
 
-In this student edition, `run_python` is disabled unless `FREECAD_MCP_ENABLE_PYTHON_EXEC=1` is explicitly set in the MCP server environment. This is a guardrail, not a sandbox. If enabled, code runs with the permissions of the logged-in user.
+In this student edition, arbitrary Python execution is disabled by default at **both ends**: the MCP tool wrapper checks the MCP server process environment, and the FreeCAD socket server independently checks the FreeCAD process environment before resolving `execute_python`. To enable it, set `FREECAD_MCP_ENABLE_PYTHON_EXEC=1` in **both** process environments and restart both applications. Setting it only for Claude Desktop/MCP does not enable execution inside FreeCAD; a raw local socket request is also rejected unless FreeCAD itself opted in. This is a guardrail, not a sandbox. If enabled, code runs with the permissions of the logged-in user.
 
 ## Local socket protocol and resource limits
 
