@@ -150,3 +150,35 @@ jobs:
           $backupCountAfterFailure = @(Get-ChildItem -LiteralPath $modRoot -Directory -Filter "AICopilot.backup-*").Count
           if ($backupCountAfterFailure -ne 1) { throw "Preflight failure unexpectedly changed backup state." }
           Write-Host "Windows installer success and preflight-preservation checks passed."
+
+      - name: Verify default FreeCAD profile version selection
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $testRoot = Join-Path $env:RUNNER_TEMP "cadpilot-profile-selection-test"
+          if (Test-Path -LiteralPath $testRoot) {
+            Remove-Item -LiteralPath $testRoot -Recurse -Force
+          }
+          $env:APPDATA = $testRoot
+          $freecadRoot = Join-Path $testRoot "FreeCAD"
+          $newestMod = Join-Path $freecadRoot "v1-10\\Mod"
+          $olderMod = Join-Path $freecadRoot "v1-9\\Mod"
+          $legacyMod = Join-Path $freecadRoot "Mod"
+          New-Item -ItemType Directory -Force -Path $olderMod, $legacyMod | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $olderMod "AICopilot"), (Join-Path $legacyMod "AICopilot") | Out-Null
+          Set-Content -LiteralPath (Join-Path $olderMod "AICopilot\\marker.txt") -Value "older"
+          Set-Content -LiteralPath (Join-Path $legacyMod "AICopilot\\marker.txt") -Value "legacy"
+
+          # The installer should create/use v1-10, not v1-9 or the legacy root.
+          & .\\scripts\\setup_windows.ps1 -SkipPythonSetup -SkipClaudeConfig
+          $newestAddon = Join-Path $newestMod "AICopilot"
+          if (-not (Test-Path -LiteralPath (Join-Path $newestAddon "InitGui.py"))) { throw "Installer did not select newest FreeCAD profile v1-10." }
+          if (-not (Test-Path -LiteralPath (Join-Path $olderMod "AICopilot\\marker.txt"))) { throw "Installer modified older FreeCAD profile." }
+          if (-not (Test-Path -LiteralPath (Join-Path $legacyMod "AICopilot\\marker.txt"))) { throw "Installer modified legacy FreeCAD profile." }
+
+          # The uninstaller must apply the same selection and leave other profiles alone.
+          & .\\scripts\\uninstall_windows.ps1
+          if (Test-Path -LiteralPath $newestAddon) { throw "Uninstaller did not remove add-on from newest FreeCAD profile." }
+          if (-not (Test-Path -LiteralPath (Join-Path $olderMod "AICopilot\\marker.txt"))) { throw "Uninstaller modified older FreeCAD profile." }
+          if (-not (Test-Path -LiteralPath (Join-Path $legacyMod "AICopilot\\marker.txt"))) { throw "Uninstaller modified legacy FreeCAD profile." }
+          Write-Host "Default FreeCAD profile selection checks passed (v1-10 selected over v1-9 and legacy)."
