@@ -84,3 +84,26 @@ def test_stop_before_start_is_safe(monkeypatch):
 
     assert observer._started is False
     assert not any(name.endswith("_remove") for name, _ in calls)
+
+
+def test_start_rolls_back_selection_registration_if_later_step_fails(monkeypatch):
+    observer_type, calls = load_observer(monkeypatch)
+    freecad = sys.modules["FreeCAD"]
+
+    def fail_document_registration(observer):
+        calls.append(("document_add_failed", observer))
+        raise RuntimeError("document observer unavailable")
+
+    freecad.addDocumentObserver = fail_document_registration
+    observer = observer_type()
+
+    try:
+        observer.start()
+    except RuntimeError as exc:
+        assert "document observer unavailable" in str(exc)
+    else:
+        raise AssertionError("start should propagate registration failure")
+
+    assert observer._started is False
+    assert observer._selection_observer_registered is False
+    assert [name for name, _ in calls].count("selection_remove") == 1
