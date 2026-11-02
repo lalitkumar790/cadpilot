@@ -71,7 +71,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $addon, $claudeDir | Out-Null
           Set-Content -LiteralPath (Join-Path $addon "marker.txt") -Value "installed"
           Set-Content -LiteralPath $config -Value '{"mcpServers":{"freecad":{"command":"python"},"other":{"command":"node"}}}'
-          & scripts/uninstall_windows.ps1
+          & .\scripts\uninstall_windows.ps1
           if (Test-Path -LiteralPath $addon) { throw "Add-on directory remains after successful uninstall." }
           $updated = Get-Content -Raw -LiteralPath $config | ConvertFrom-Json
           if ($null -ne $updated.mcpServers.PSObject.Properties["freecad"]) { throw "freecad config entry was not removed." }
@@ -84,7 +84,7 @@ jobs:
           Set-Content -LiteralPath $config -Value '{"mcpServers":'
           $malformedConfigRejected = $false
           try {
-            & scripts/uninstall_windows.ps1
+            & .\scripts\uninstall_windows.ps1
           } catch {
             $malformedConfigRejected = $true
             Write-Host "Expected rejection: $($_.Exception.Message)"
