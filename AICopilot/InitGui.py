@@ -81,6 +81,10 @@ class GlobalAIService:
             self.socket_server = None
             
         if self.event_observer:
+            try:
+                self.event_observer.stop()
+            except Exception as e:
+                FreeCAD.Console.PrintError(f"Event observer shutdown error: {e}\\n")
             self.event_observer = None
             
         self.is_running = False
