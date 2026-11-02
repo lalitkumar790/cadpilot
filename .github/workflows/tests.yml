@@ -91,6 +91,37 @@ jobs:
           }
           if (-not $malformedConfigRejected) { throw "Uninstaller unexpectedly accepted malformed Claude JSON." }
           if (-not (Test-Path -LiteralPath (Join-Path $addon "marker.txt"))) { throw "Add-on was changed despite malformed Claude JSON." }
+
+          # Force the config replacement to fail after the add-on has been
+          # quarantined. The exclusive file handle simulates another process
+          # holding Claude's config open; the uninstaller must restore the add-on.
+          Set-Content -LiteralPath $config -Value '{"mcpServers":{"freecad":{"command":"python"},"other":{"command":"node"}}}'
+          $configLock = [System.IO.File]::Open(
+            $config,
+            [System.IO.FileMode]::Open,
+            [System.IO.FileAccess]::Read,
+            [System.IO.FileShare]::None
+          )
+          $writeFailureRejected = $false
+          try {
+            & .\scripts\uninstall_windows.ps1
+          } catch {
+            $writeFailureRejected = $true
+            Write-Host "Expected config-write rollback: $($_.Exception.Message)"
+          } finally {
+            $configLock.Dispose()
+          }
+          if (-not $writeFailureRejected) { throw "Uninstaller unexpectedly succeeded while Claude config was locked." }
+          if (-not (Test-Path -LiteralPath (Join-Path $addon "marker.txt"))) {
+            throw "Add-on was not restored after Claude config replacement failed."
+          }
+          $restoredConfig = Get-Content -Raw -LiteralPath $config | ConvertFrom-Json
+          if ($null -eq $restoredConfig.mcpServers.PSObject.Properties["freecad"]) {
+            throw "Claude config lost its freecad entry after rollback."
+          }
+          if (@(Get-ChildItem -LiteralPath $modRoot -Directory -Filter "AICopilot.uninstall-backup-*").Count -ne 0) {
+            throw "Uninstaller left a quarantined add-on behind after rollback."
+          }
           Write-Host "Windows uninstaller success and rollback checks passed."
 
       - name: Exercise Windows installer success and preflight rollback paths
