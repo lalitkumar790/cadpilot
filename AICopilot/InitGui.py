@@ -48,10 +48,21 @@ class GlobalAIService:
                 FreeCAD.__ai_socket_server = self.socket_server
                 FreeCAD.Console.PrintMessage("✅ AI Socket Server started - Claude Desktop ready\n")
             else:
-                FreeCAD.Console.PrintError("❌ Failed to start AI socket server\n")
+                FreeCAD.Console.PrintError("❌ Failed to start AI socket server\\n")
+                try:
+                    self.socket_server.stop_server()
+                except Exception:
+                    pass
+                self.socket_server = None
                 return False
         except Exception as e:
-            FreeCAD.Console.PrintError(f"❌ Socket server error: {e}\n")
+            if self.socket_server:
+                try:
+                    self.socket_server.stop_server()
+                except Exception:
+                    pass
+                self.socket_server = None
+            FreeCAD.Console.PrintError(f"❌ Socket server error: {e}\\n")
             return False
             
         # Start event observer for learning
@@ -74,7 +85,7 @@ class GlobalAIService:
         if not self.is_running and not self.socket_server and not self.event_observer:
             return
 
-        FreeCAD.Console.PrintMessage("🔄 Stopping AI Copilot Service...\\n")
+        FreeCAD.Console.PrintMessage("🔄 Stopping AI Copilot Service...\n")
         errors = []
         socket_server = self.socket_server
         event_observer = self.event_observer
@@ -109,8 +120,8 @@ class GlobalAIService:
                     errors.append(f"Could not clear {attribute}: {e}")
 
         for error in errors:
-            FreeCAD.Console.PrintError(error + "\\n")
-        FreeCAD.Console.PrintMessage("✅ AI Copilot Service stopped\\n")
+            FreeCAD.Console.PrintError(error + "\n")
+        FreeCAD.Console.PrintMessage("✅ AI Copilot Service stopped\n")
 
 # ============================================================================
 # AUTO-START: Initialize AI service when FreeCAD GUI loads
