@@ -1,67 +1,4 @@
 # CADPilot — AI-Powered FreeCAD Assistant
-
-Give Claude Desktop the ability to create and edit CAD models in FreeCAD through natural-language instructions.
-
-> **Maintainer-tested:** CADPilot has been tested successfully on the maintainer’s Windows laptop with FreeCAD and Claude Desktop. This repository packages that working setup with student-focused installation instructions. Windows is the documented target platform; other operating systems may require manual adaptation.
-
-## What it does
-
-This project has two parts that must both be running:
-
-1. **CADPilot workbench** — installed inside FreeCAD. It starts a local socket service.
-2. **Python MCP server** — launched by Claude Desktop. It exposes CAD operations to Claude and forwards them to FreeCAD.
-
-Claude Desktop communicates with the MCP server over standard input/output (stdio). The MCP server communicates with FreeCAD over a local-only socket (Windows: `localhost:23456`; macOS/Linux: `/tmp/freecad_mcp.sock`).
-
-## Quick start for Windows students
-
-### Software to install
-
-Install these first:
-
-1. **FreeCAD 1.0 or newer** — download from [freecad.org](https://www.freecad.org/downloads.php).
-2. **Python 3.11 (64-bit) or newer** — download from [python.org](https://www.python.org/downloads/windows/). During installation, select **Add python.exe to PATH**. The MCP Python SDK v2 requires Python 3.11+.
-3. **Claude Desktop** — download from [claude.com/download](https://claude.com/download). Sign in and make sure the desktop app is up to date.
-4. **Git for Windows (optional)** — only needed if you want to clone/pull the repository. A ZIP download works without Git: [git-scm.com](https://git-scm.com/download/win).
-
-You do **not** need Node.js, Docker, a separate database, or an API key for this local bridge. Claude account access is still required to use Claude Desktop.
-
-### Step 1 — Get the project
-
-**Option A: Download ZIP (easiest)**
-
-1. Open the project's GitHub page.
-2. Click **Code → Download ZIP**.
-3. Extract it to a simple path, for example:
-
-   `C:\Users\YOUR_WINDOWS_USERNAME\Documents\cadpilot`
-
-4. Open that extracted folder. You must see `README.md`, `pyproject.toml`, `AICopilot`, `freecad_mcp`, and `scripts` directly inside it.
-
-**Option B: Clone with Git**
-
-Open PowerShell and run:
-
-```powershell
-cd $HOME\Documents
-git clone https://github.com/YOUR_GITHUB_USERNAME/cadpilot.git
-cd cadpilot
-```
-
-Replace `YOUR_GITHUB_USERNAME` with the repository owner's GitHub username.
-
-### Step 2 — Run the installer
-
-Close FreeCAD before running the installer.
-
-1. Open the project folder in File Explorer.
-2. Right-click inside the folder and choose **Open in Terminal** (or open PowerShell and `cd` into the folder).
-3. Run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\setup_windows.ps1
-```
-
 The script will:
 
 - Verify that Python 3.11+ is available.
@@ -305,3 +242,47 @@ SECURITY.md                Security notes and reporting
 ## Contributing
 
 Bug reports and improvements are welcome. Please include OS, FreeCAD version, Python version, Claude Desktop version, and relevant logs. Do not include private CAD files or personal data in public issues.
+=======
+The setup script creates a virtual environment, installs the Python MCP server, copies only `AICopilot` into FreeCAD’s user `Mod` folder, and configures Claude Desktop while preserving existing MCP entries. Restart FreeCAD and Claude Desktop. Ask Claude to run `check_freecad_connection`.
+
+Try: “Create a 40 × 30 × 20 mm box named FirstCADPilotBox and report its dimensions.” Inspect the result in FreeCAD.
+
+## Student CAD workflow
+
+1. Describe the engineering component, purpose, constraints, and approximate dimensions.
+2. Ask Claude for a modelling plan and assumptions before generating geometry.
+3. Build incrementally: base geometry, sketches, pockets, holes, fillets, chamfers, and other features.
+4. Inspect dimensions, placements, geometry, and feature history after each major operation.
+5. Iterate with specific changes; save the editable `.FCStd` project and export STEP/STL as needed.
+6. Independently validate fits, clearances, tolerances, wall thickness, and manufacturability. AI-generated geometry is not engineering certification.
+
+See `SAMPLE_PROMPTS.md`, `SECURITY.md`, and `LICENSING_AND_RELEASE.md` for more guidance.
+
+## Important paths (Windows)
+
+- Project: `C:\Users\YOUR_NAME\Documents\cadpilot`
+- Python environment: `cadpilot\.venv`
+- FreeCAD workbench: FreeCAD user `Mod\AICopilot`
+- Claude config: `%APPDATA%\Claude\claude_desktop_config.json`
+
+**Do not copy the entire repository into FreeCAD’s `Mod` folder.** Keep the project in Documents; the setup script copies only `AICopilot` into `Mod`.
+
+The setup script configures Claude automatically. The server executable must reference your own `cadpilot\.venv\Scripts\python.exe`, not another student’s absolute path. An example is in `config/claude_desktop_config.example.json`.
+
+## Uninstall
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\uninstall_windows.ps1
+```
+
+## Troubleshooting
+
+- No tools in Claude: fully quit and relaunch Claude Desktop; check the MCP config and `.venv\Scripts\python.exe` path.
+- Connection fails: keep FreeCAD open and check that the workbench/socket service started in the FreeCAD report/console.
+- Python not found: reinstall Python 3.11+ 64-bit with PATH enabled, then rerun setup.
+- Only `AICopilot` belongs in FreeCAD’s `Mod` directory; `freecad_mcp` and `.venv` stay in the repository.
+
+Windows is the documented setup. macOS/Linux may require manual adaptation. Bug reports should include OS, FreeCAD/Python/Claude versions, and the exact error. Do not upload sensitive project files.
+
+Review `LICENSING_AND_RELEASE.md` for licensing and attribution requirements before redistribution.
+>>>>>>> 223b66b062578a32115cbd39a5feafc845db8b2a
