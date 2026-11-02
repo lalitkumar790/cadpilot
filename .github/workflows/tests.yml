@@ -53,3 +53,35 @@ jobs:
             }
             Write-Host "PowerShell syntax OK: $file"
           }
+      - name: Exercise Windows uninstaller rollback and success paths
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $testRoot = Join-Path $env:RUNNER_TEMP "cadpilot-uninstall-test"
+          if (Test-Path -LiteralPath $testRoot) {
+            Remove-Item -LiteralPath $testRoot -Recurse -Force
+          }
+          $env:APPDATA = $testRoot
+          $modRoot = Join-Path $testRoot "FreeCAD\v1-1\Mod"
+          $addon = Join-Path $modRoot "AICopilot"
+          $claudeDir = Join-Path $testRoot "Claude"
+          $config = Join-Path $claudeDir "claude_desktop_config.json"
+          New-Item -ItemType Directory -Force -Path $addon, $claudeDir | Out-Null
+          Set-Content -LiteralPath (Join-Path $addon "marker.txt") -Value "installed"
+          Set-Content -LiteralPath $config -Value '{"mcpServers":{"freecad":{"command":"python"},"other":{"command":"node"}}}'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall_windows.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Uninstaller failed on valid config." }
+          if (Test-Path -LiteralPath $addon) { throw "Add-on directory remains after successful uninstall." }
+          $updated = Get-Content -Raw -LiteralPath $config | ConvertFrom-Json
+          if ($null -ne $updated.mcpServers.PSObject.Properties["freecad"]) { throw "freecad config entry was not removed." }
+          if ($null -eq $updated.mcpServers.PSObject.Properties["other"]) { throw "Unrelated MCP config entry was lost." }
+          if (-not (Get-ChildItem -LiteralPath $claudeDir -Filter "claude_desktop_config.backup-*.json")) { throw "Claude config backup was not created." }
+
+          # Malformed config must fail without moving or deleting the add-on.
+          New-Item -ItemType Directory -Force -Path $addon | Out-Null
+          Set-Content -LiteralPath (Join-Path $addon "marker.txt") -Value "still-installed"
+          Set-Content -LiteralPath $config -Value '{"mcpServers":'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall_windows.ps1
+          if ($LASTEXITCODE -eq 0) { throw "Uninstaller unexpectedly accepted malformed Claude JSON." }
+          if (-not (Test-Path -LiteralPath (Join-Path $addon "marker.txt"))) { throw "Add-on was changed despite malformed Claude JSON." }
+          Write-Host "Windows uninstaller success and rollback checks passed."
