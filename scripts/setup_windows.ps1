@@ -94,19 +94,33 @@ if (-not $SkipFreeCADAddon) {
     $AddonTarget = Join-Path $ModRoot "AICopilot"
     New-Item -ItemType Directory -Force -Path $ModRoot | Out-Null
 
-    if (Test-Path $AddonTarget) {
+    $Backup = $null
+    if (Test-Path -LiteralPath $AddonTarget) {
         $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
         $Backup = Join-Path $ModRoot "AICopilot.backup-$Stamp"
         Write-Host "Backing up existing add-on to $Backup"
-        Move-Item -Path $AddonTarget -Destination $Backup
+        Move-Item -LiteralPath $AddonTarget -Destination $Backup
     }
 
-    Copy-Item -Path $AddonSource -Destination $AddonTarget -Recurse -Force
-    foreach ($RequiredFile in $RequiredAddonFiles) {
-        $InstalledFile = Join-Path $AddonTarget $RequiredFile
-        if (-not (Test-Path -LiteralPath $InstalledFile -PathType Leaf)) {
-            throw "Add-on installation verification failed; missing: $InstalledFile"
+    try {
+        Copy-Item -LiteralPath $AddonSource -Destination $AddonTarget -Recurse -Force
+        foreach ($RequiredFile in $RequiredAddonFiles) {
+            $InstalledFile = Join-Path $AddonTarget $RequiredFile
+            if (-not (Test-Path -LiteralPath $InstalledFile -PathType Leaf)) {
+                throw "Add-on installation verification failed; missing: $InstalledFile"
+            }
         }
+    } catch {
+        # Never leave a previously working add-on stranded in its backup
+        # location after an interrupted or incomplete update.
+        if (Test-Path -LiteralPath $AddonTarget) {
+            Remove-Item -LiteralPath $AddonTarget -Recurse -Force
+        }
+        if ($Backup -and (Test-Path -LiteralPath $Backup)) {
+            Move-Item -LiteralPath $Backup -Destination $AddonTarget
+            Write-Warning "Restored the previous FreeCAD add-on from $Backup"
+        }
+        throw
     }
     Write-Host "Verified FreeCAD workbench files: $AddonTarget" -ForegroundColor Green
 }
