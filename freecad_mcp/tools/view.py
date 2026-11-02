@@ -104,3 +104,55 @@ def get_mass_properties(object_name: str) -> str:
 def get_bounding_box(object_name: str) -> str:
     """Get the bounding box dimensions of an object."""
     return dispatch("get_bounding_box", object_name=object_name)
+
+@mcp_server.tool()
+def diagnose_local_setup() -> str:
+    """Diagnose the local CADPilot Python environment and FreeCAD connection."""
+    import importlib.util
+    import json
+    import sys
+    from pathlib import Path
+
+    checks = []
+    project_root = Path(__file__).resolve().parents[2]
+    checks.append({
+        "name": "Python version",
+        "ok": sys.version_info >= (3, 11),
+        "detail": sys.version.split()[0] + (" (3.11+ recommended)" if sys.version_info < (3, 11) else ""),
+    })
+    checks.append({
+        "name": "CADPilot project files",
+        "ok": (project_root / "freecad_mcp" / "server.py").is_file()
+              and (project_root / "AICopilot" / "socket_server.py").is_file(),
+        "detail": str(project_root),
+    })
+    checks.append({
+        "name": "MCP Python package",
+        "ok": importlib.util.find_spec("mcp") is not None,
+        "detail": "Importable" if importlib.util.find_spec("mcp") is not None else "Not found; install CADPilot dependencies in this Python environment",
+    })
+
+    connection_result = dispatch("check_freecad_connection")
+    try:
+        connection = json.loads(connection_result)
+    except (TypeError, ValueError):
+        connection = {"raw": connection_result}
+    connected = not bool(connection.get("error")) and not bool(connection.get("raw"))
+    checks.append({
+        "name": "FreeCAD socket connection",
+        "ok": connected,
+        "detail": "Connected" if connected else str(connection.get("error") or connection.get("raw") or connection),
+    })
+
+    passed = sum(1 for item in checks if item["ok"])
+    return json.dumps({
+        "status": "ok" if passed == len(checks) else "needs_attention",
+        "passed": passed,
+        "total": len(checks),
+        "checks": checks,
+        "next_steps": [] if passed == len(checks) else [
+            "Run this diagnostic from the CADPilot project's configured virtual environment.",
+            "Start or restart FreeCAD and confirm the AICopilot add-on is installed in the active profile.",
+            "If the MCP package check fails, run: python -m pip install -e .",
+        ],
+    }, indent=2)
