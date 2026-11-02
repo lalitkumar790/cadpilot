@@ -365,7 +365,22 @@ class FreeCADSocketServer:
             return True
             
         except Exception as e:
-            FreeCAD.Console.PrintError(f"Failed to start socket server: {e}\n")
+            # A bind/listen/thread-start failure can leave a socket allocated.
+            # Release it so a retry does not inherit a half-started server.
+            self.is_running = False
+            _stop_gui_task_processor()
+            if self.server_socket:
+                try:
+                    self.server_socket.close()
+                except OSError:
+                    pass
+                self.server_socket = None
+            if not IS_WINDOWS and os.path.exists(self.socket_path):
+                try:
+                    os.remove(self.socket_path)
+                except OSError:
+                    pass
+            FreeCAD.Console.PrintError(f"Failed to start socket server: {e}\\n")
             return False
             
     def _server_loop(self):
