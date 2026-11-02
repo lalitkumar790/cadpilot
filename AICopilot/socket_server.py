@@ -77,9 +77,13 @@ def process_gui_tasks():
     client instead of propagating and freezing/crashing FreeCAD."""
     while not gui_task_queue.empty():
         try:
-            func, result_queue, op_name = gui_task_queue.get_nowait()
+            func, result_queue, op_name, cancelled = gui_task_queue.get_nowait()
         except queue.Empty:
             break
+        if cancelled.is_set():
+            _log("gui-skip", f"discarding timed-out '{op_name}' before execution")
+            gui_task_queue.task_done()
+            continue
         _log("gui-dispatch", f"starting '{op_name}'")
         try:
             value = func()
@@ -88,6 +92,8 @@ def process_gui_tasks():
         except Exception as e:
             _log("gui-exception", f"'{op_name}' raised: {e}")
             result_queue.put((False, f"Error executing {op_name}: {e}"))
+        finally:
+            gui_task_queue.task_done()
 
     # Reschedule ourselves on the GUI thread. Polling interval unchanged
     # from the original implementation (100ms) — this is the existing,
@@ -105,11 +111,15 @@ def run_on_gui_thread(func, timeout: float = 20.0, op_name: str = "operation"):
     instead of raising into _handle_client).
     """
     result_queue: "queue.Queue" = queue.Queue(maxsize=1)
+    cancelled = threading.Event()
     _log("request-queued", f"'{op_name}' queued for GUI thread")
-    gui_task_queue.put((func, result_queue, op_name))
+    gui_task_queue.put((func, result_queue, op_name, cancelled))
     try:
         ok, value = result_queue.get(timeout=timeout)
     except queue.Empty:
+        # Do not execute queued work after its caller has already timed out.
+        # An operation already running on the GUI thread cannot be interrupted safely.
+        cancelled.set()
         _log("timeout", f"'{op_name}' timed out after {timeout}s waiting for GUI thread")
         return (
             f"Timeout: '{op_name}' did not complete within {timeout}s. "
@@ -273,6 +283,8 @@ class FreeCADSocketServer:
         self.server_socket = None
         self.is_running = False
         self.client_connections = []
+        self._clients_lock = threading.Lock()
+        self._server_thread = None
         
         # Initialize universal selection system
         self.selector = UniversalSelector()
@@ -319,8 +331,10 @@ class FreeCADSocketServer:
             self.is_running = True
             
             # Start server thread
-            server_thread = threading.Thread(target=self._server_loop, daemon=True)
-            server_thread.start()
+            self._server_thread = threading.Thread(
+                target=self._server_loop, name="FreeCAD-MCP-Accept", daemon=True
+            )
+            self._server_thread.start()
             
             # Initialize GUI task processor
             QtCore.QTimer.singleShot(100, process_gui_tasks)
@@ -340,13 +354,16 @@ class FreeCADSocketServer:
                 _log("socket-accept", f"connection from {addr}")
                 
                 # Handle client in separate thread
+                # Register before starting the worker to avoid a fast-client race.
+                with self._clients_lock:
+                    self.client_connections.append(client_socket)
                 client_thread = threading.Thread(
                     target=self._handle_client,
                     args=(client_socket,),
+                    name="FreeCAD-MCP-Client",
                     daemon=True
                 )
                 client_thread.start()
-                self.client_connections.append(client_socket)
                 
             except Exception as e:
                 if self.is_running:
@@ -413,8 +430,9 @@ class FreeCADSocketServer:
                 client_socket.close()
             except OSError:
                 pass
-            if client_socket in self.client_connections:
-                self.client_connections.remove(client_socket)
+            with self._clients_lock:
+                if client_socket in self.client_connections:
+                    self.client_connections.remove(client_socket)
 
     def _process_command(self, command_str: str) -> str:
         """Process incoming command and return response"""
@@ -3243,14 +3261,29 @@ class FreeCADSocketServer:
         """Stop the socket server"""
         self.is_running = False
         
-        # Close all client connections
-        for client in self.client_connections[:]:
-            client.close()
-        self.client_connections.clear()
-        
-        # Close server socket
+        # Closing the listening socket unblocks accept(); shutdown active clients
+        # so their workers do not remain blocked in recv().
         if self.server_socket:
-            self.server_socket.close()
+            try:
+                self.server_socket.close()
+            except OSError:
+                pass
+            self.server_socket = None
+
+        with self._clients_lock:
+            clients = list(self.client_connections)
+        for client in clients:
+            try:
+                client.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
+                client.close()
+            except OSError:
+                pass
+
+        if self._server_thread and self._server_thread is not threading.current_thread():
+            self._server_thread.join(timeout=1.0)
             
         # Remove socket file
         if os.path.exists(self.socket_path):
