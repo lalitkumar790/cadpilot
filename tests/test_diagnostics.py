@@ -87,3 +87,33 @@ def test_wrong_arguments_or_working_directory_fail(tmp_path):
 
     assert result["ok"] is False
     assert "different project folder" in result["detail"]
+
+
+def test_wrong_module_arguments_fail(tmp_path):
+    root = tmp_path / "cadpilot"
+    root.mkdir()
+    python = root / ".venv" / "Scripts" / "python.exe"
+    python.parent.mkdir(parents=True)
+    python.write_text("python", encoding="utf-8")
+    config = tmp_path / "claude_desktop_config.json"
+    value = valid_config(python, root)
+    value["mcpServers"]["freecad"]["args"] = ["-m", "wrong.module"]
+    write_config(config, value)
+
+    result = inspect_claude_config(config, root, python)
+
+    assert result["ok"] is False
+    assert "args should be" in result["detail"]
+
+
+def test_missing_configured_python_fails(tmp_path):
+    root = tmp_path / "cadpilot"
+    root.mkdir()
+    python = root / ".venv" / "Scripts" / "python.exe"
+    config = tmp_path / "claude_desktop_config.json"
+    write_config(config, valid_config(python, root))
+
+    result = inspect_claude_config(config, root, python)
+
+    assert result["ok"] is False
+    assert "does not exist" in result["detail"]
