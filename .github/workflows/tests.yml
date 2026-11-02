@@ -94,7 +94,7 @@ jobs:
 
           # Syntactically valid JSON with an invalid Claude config shape must
           # also fail safely before the add-on is moved.
-          foreach ($invalidConfig in @('[]', '{"mcpServers":[]}')) {
+          foreach ($invalidConfig in @('[]', 'null', '"claude-config"', '{"mcpServers":[]}', '{"mcpServers":null}')) {
             Set-Content -LiteralPath $config -Value $invalidConfig
             $schemaRejected = $false
             try {
