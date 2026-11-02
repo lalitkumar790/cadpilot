@@ -14,6 +14,7 @@ import platform
 from typing import Dict, Any, List, Optional
 from PySide import QtCore
 from security_policy import python_execution_enabled
+from request_validation import validate_command_payload
 
 # Platform-specific socket handling
 IS_WINDOWS = platform.system() == "Windows"
@@ -466,15 +467,15 @@ class FreeCADSocketServer:
     def _process_command(self, command_str: str) -> str:
         """Process incoming command and return response"""
         try:
-            # Parse JSON command
-            command = json.loads(command_str)
-            
-            # Extract tool name and arguments
-            tool_name = command.get('tool')
-            args = command.get('args', {})
-            
-            # Route to appropriate handler
-            result = self._execute_tool(tool_name, args)
+            # Parse JSON and enforce the same strict boundary for every
+            # caller, including clients that bypass the MCP bridge.
+            command = json.loads(command_str, parse_constant=lambda value: (_ for _ in ()).throw(
+                ValueError(f"Invalid JSON numeric constant: {value}")
+            ))
+            command = validate_command_payload(command)
+
+            # Route only a validated tool identifier and argument object.
+            result = self._execute_tool(command["tool"], command["args"])
             
             return json.dumps({
                 "success": True,
