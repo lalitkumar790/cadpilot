@@ -129,7 +129,7 @@ This removes the CADPilot add-on from the detected FreeCAD profile and the `free
 powershell -ExecutionPolicy Bypass -File .\\scripts\\uninstall_windows.ps1 -FreeCADModDirectory "C:\\PATH\\TO\\FreeCAD\\Mod"
 ```
 
-The uninstaller validates Claude's JSON before changing anything, backs up the config, and restores it if add-on removal fails.
+The uninstaller validates Claude's JSON before changing anything, temporarily renames the add-on so it can be restored if the config update fails, and backs up the Claude config before changing it. After a successful config update it deletes the temporary add-on backup; if deletion is blocked, the backup is left in place and its path is reported.
 
 ## Developer tests
 
