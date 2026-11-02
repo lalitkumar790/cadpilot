@@ -48,7 +48,7 @@ if (($Major -lt 3) -or (($Major -eq 3) -and ($Minor -lt 11))) {
 Write-Host "Using $VersionText"
 
 $VenvPython = Join-Path $RepoRoot ".venv\Scripts\python.exe"
-if (-not (Test-Path $VenvPython)) {
+if (-not (Test-Path -LiteralPath $VenvPython -PathType Leaf)) {
     Write-Host "Creating virtual environment..."
     & $PythonCommand @PythonPrefixArgs -m venv (Join-Path $RepoRoot ".venv")
     if ($LASTEXITCODE -ne 0) { throw "Could not create Python virtual environment." }
@@ -63,18 +63,29 @@ if ($LASTEXITCODE -ne 0) { throw "Project installation failed." }
 if (-not $SkipFreeCADAddon) {
     if ([string]::IsNullOrWhiteSpace($FreeCADModDirectory)) {
         $FreeCADRoot = Join-Path $env:APPDATA "FreeCAD"
-        # FreeCAD 1.0 commonly uses FreeCAD\\Mod; 1.1+ may use
-        # a version-specific user-data directory such as FreeCAD\\v1-1\\Mod.
-        $VersionedRoots = @(Get-ChildItem -Path $FreeCADRoot -Directory -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -match '^v\d+-\d+
+        # FreeCAD 1.0 commonly uses FreeCAD\Mod; newer versions may use
+        # versioned user-data directories such as FreeCAD\v1-1\Mod.
+        $VersionedRoots = @()
+        if (Test-Path -LiteralPath $FreeCADRoot -PathType Container) {
+            $VersionedRoots = @(Get-ChildItem -LiteralPath $FreeCADRoot -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -match '^v\d+-\d+$' } |
+                Sort-Object -Property @{
+                    Expression = { [version](($_.Name -replace '^v', '') -replace '-', '.') }
+                    Descending = $true
+                })
+        }
         if ($VersionedRoots.Count -gt 0) {
             $ModRoot = Join-Path $VersionedRoots[0].FullName "Mod"
         } else {
             $ModRoot = Join-Path $FreeCADRoot "Mod"
         }
     } else {
+        if (-not (Test-Path -LiteralPath $FreeCADModDirectory -PathType Container)) {
+            throw "FreeCAD Mod directory does not exist: $FreeCADModDirectory"
+        }
         $ModRoot = (Resolve-Path -LiteralPath $FreeCADModDirectory).Path
     }
+
     $AddonSource = Join-Path $RepoRoot "AICopilot"
     $RequiredAddonFiles = @(
         "InitGui.py",
@@ -94,234 +105,8 @@ if (-not $SkipFreeCADAddon) {
     New-Item -ItemType Directory -Force -Path $ModRoot | Out-Null
 
     $Backup = $null
-    if (Test-Path -LiteralPath $AddonTarget) {
-        $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-        $Backup = Join-Path $ModRoot "AICopilot.backup-$Stamp"
-        Write-Host "Backing up existing add-on to $Backup"
-        Move-Item -LiteralPath $AddonTarget -Destination $Backup
-    }
-
-    try {
-        Copy-Item -LiteralPath $AddonSource -Destination $AddonTarget -Recurse -Force
-        foreach ($RequiredFile in $RequiredAddonFiles) {
-            $InstalledFile = Join-Path $AddonTarget $RequiredFile
-            if (-not (Test-Path -LiteralPath $InstalledFile -PathType Leaf)) {
-                throw "Add-on installation verification failed; missing: $InstalledFile"
-            }
-        }
-    } catch {
-        # Never leave a previously working add-on stranded in its backup
-        # location after an interrupted or incomplete update.
-        if (Test-Path -LiteralPath $AddonTarget) {
-            Remove-Item -LiteralPath $AddonTarget -Recurse -Force
-        }
-        if ($Backup -and (Test-Path -LiteralPath $Backup)) {
-            Move-Item -LiteralPath $Backup -Destination $AddonTarget
-            Write-Warning "Restored the previous FreeCAD add-on from $Backup"
-        }
-        throw
-    }
-    Write-Host "Verified FreeCAD workbench files: $AddonTarget" -ForegroundColor Green
-}
-
-if (-not $SkipClaudeConfig) {
-    Write-Host "Configuring Claude Desktop..."
-    & $VenvPython (Join-Path $PSScriptRoot "configure_claude.py") --repo-root $RepoRoot
-    if ($LASTEXITCODE -ne 0) { throw "Claude Desktop configuration failed." }
-}
-
-Write-Host ""
-Write-Host "Setup completed." -ForegroundColor Green
-if (-not $SkipFreeCADAddon) {
-    Write-Host "NEXT: Start/restart FreeCAD and check the Python console for the AI Copilot startup message."
-}
-if (-not $SkipClaudeConfig) {
-    Write-Host "NEXT: Completely quit and restart Claude Desktop."
-}
-Write-Host "Then ask Claude to call check_freecad_connection."
- } |
-            Sort-Object @{
-                Expression = { [int]([regex]::Match($_.Name, '^v(\d+)-(\d+)
-        if ($VersionedRoots.Count -gt 0) {
-            $ModRoot = Join-Path $VersionedRoots[0].FullName "Mod"
-        } else {
-            $ModRoot = Join-Path $FreeCADRoot "Mod"
-        }
-    } else {
-        $ModRoot = (Resolve-Path -LiteralPath $FreeCADModDirectory).Path
-    }
-    $AddonSource = Join-Path $RepoRoot "AICopilot"
-    $RequiredAddonFiles = @(
-        "InitGui.py",
-        "socket_server.py",
-        "security_policy.py",
-        "request_validation.py",
-        "export_validation.py"
-    )
-    foreach ($RequiredFile in $RequiredAddonFiles) {
-        $SourceFile = Join-Path $AddonSource $RequiredFile
-        if (-not (Test-Path -LiteralPath $SourceFile -PathType Leaf)) {
-            throw "Required FreeCAD add-on file is missing: $SourceFile. Re-download or re-extract the complete CADPilot repository."
-        }
-    }
-
-    $AddonTarget = Join-Path $ModRoot "AICopilot"
-    New-Item -ItemType Directory -Force -Path $ModRoot | Out-Null
-
-    $Backup = $null
-    if (Test-Path -LiteralPath $AddonTarget) {
-        $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-        $Backup = Join-Path $ModRoot "AICopilot.backup-$Stamp"
-        Write-Host "Backing up existing add-on to $Backup"
-        Move-Item -LiteralPath $AddonTarget -Destination $Backup
-    }
-
-    try {
-        Copy-Item -LiteralPath $AddonSource -Destination $AddonTarget -Recurse -Force
-        foreach ($RequiredFile in $RequiredAddonFiles) {
-            $InstalledFile = Join-Path $AddonTarget $RequiredFile
-            if (-not (Test-Path -LiteralPath $InstalledFile -PathType Leaf)) {
-                throw "Add-on installation verification failed; missing: $InstalledFile"
-            }
-        }
-    } catch {
-        # Never leave a previously working add-on stranded in its backup
-        # location after an interrupted or incomplete update.
-        if (Test-Path -LiteralPath $AddonTarget) {
-            Remove-Item -LiteralPath $AddonTarget -Recurse -Force
-        }
-        if ($Backup -and (Test-Path -LiteralPath $Backup)) {
-            Move-Item -LiteralPath $Backup -Destination $AddonTarget
-            Write-Warning "Restored the previous FreeCAD add-on from $Backup"
-        }
-        throw
-    }
-    Write-Host "Verified FreeCAD workbench files: $AddonTarget" -ForegroundColor Green
-}
-
-if (-not $SkipClaudeConfig) {
-    Write-Host "Configuring Claude Desktop..."
-    & $VenvPython (Join-Path $PSScriptRoot "configure_claude.py") --repo-root $RepoRoot
-    if ($LASTEXITCODE -ne 0) { throw "Claude Desktop configuration failed." }
-}
-
-Write-Host ""
-Write-Host "Setup completed." -ForegroundColor Green
-if (-not $SkipFreeCADAddon) {
-    Write-Host "NEXT: Start/restart FreeCAD and check the Python console for the AI Copilot startup message."
-}
-if (-not $SkipClaudeConfig) {
-    Write-Host "NEXT: Completely quit and restart Claude Desktop."
-}
-Write-Host "Then ask Claude to call check_freecad_connection."
-).Groups[1].Value) }
-                Descending = $true
-            }, @{
-                Expression = { [int]([regex]::Match($_.Name, '^v(\d+)-(\d+)
-        if ($VersionedRoots.Count -gt 0) {
-            $ModRoot = Join-Path $VersionedRoots[0].FullName "Mod"
-        } else {
-            $ModRoot = Join-Path $FreeCADRoot "Mod"
-        }
-    } else {
-        $ModRoot = (Resolve-Path -LiteralPath $FreeCADModDirectory).Path
-    }
-    $AddonSource = Join-Path $RepoRoot "AICopilot"
-    $RequiredAddonFiles = @(
-        "InitGui.py",
-        "socket_server.py",
-        "security_policy.py",
-        "request_validation.py",
-        "export_validation.py"
-    )
-    foreach ($RequiredFile in $RequiredAddonFiles) {
-        $SourceFile = Join-Path $AddonSource $RequiredFile
-        if (-not (Test-Path -LiteralPath $SourceFile -PathType Leaf)) {
-            throw "Required FreeCAD add-on file is missing: $SourceFile. Re-download or re-extract the complete CADPilot repository."
-        }
-    }
-
-    $AddonTarget = Join-Path $ModRoot "AICopilot"
-    New-Item -ItemType Directory -Force -Path $ModRoot | Out-Null
-
-    $Backup = $null
-    if (Test-Path -LiteralPath $AddonTarget) {
-        $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-        $Backup = Join-Path $ModRoot "AICopilot.backup-$Stamp"
-        Write-Host "Backing up existing add-on to $Backup"
-        Move-Item -LiteralPath $AddonTarget -Destination $Backup
-    }
-
-    try {
-        Copy-Item -LiteralPath $AddonSource -Destination $AddonTarget -Recurse -Force
-        foreach ($RequiredFile in $RequiredAddonFiles) {
-            $InstalledFile = Join-Path $AddonTarget $RequiredFile
-            if (-not (Test-Path -LiteralPath $InstalledFile -PathType Leaf)) {
-                throw "Add-on installation verification failed; missing: $InstalledFile"
-            }
-        }
-    } catch {
-        # Never leave a previously working add-on stranded in its backup
-        # location after an interrupted or incomplete update.
-        if (Test-Path -LiteralPath $AddonTarget) {
-            Remove-Item -LiteralPath $AddonTarget -Recurse -Force
-        }
-        if ($Backup -and (Test-Path -LiteralPath $Backup)) {
-            Move-Item -LiteralPath $Backup -Destination $AddonTarget
-            Write-Warning "Restored the previous FreeCAD add-on from $Backup"
-        }
-        throw
-    }
-    Write-Host "Verified FreeCAD workbench files: $AddonTarget" -ForegroundColor Green
-}
-
-if (-not $SkipClaudeConfig) {
-    Write-Host "Configuring Claude Desktop..."
-    & $VenvPython (Join-Path $PSScriptRoot "configure_claude.py") --repo-root $RepoRoot
-    if ($LASTEXITCODE -ne 0) { throw "Claude Desktop configuration failed." }
-}
-
-Write-Host ""
-Write-Host "Setup completed." -ForegroundColor Green
-if (-not $SkipFreeCADAddon) {
-    Write-Host "NEXT: Start/restart FreeCAD and check the Python console for the AI Copilot startup message."
-}
-if (-not $SkipClaudeConfig) {
-    Write-Host "NEXT: Completely quit and restart Claude Desktop."
-}
-Write-Host "Then ask Claude to call check_freecad_connection."
-).Groups[2].Value) }
-                Descending = $true
-            })
-        if ($VersionedRoots.Count -gt 0) {
-            $ModRoot = Join-Path $VersionedRoots[0].FullName "Mod"
-        } else {
-            $ModRoot = Join-Path $FreeCADRoot "Mod"
-        }
-    } else {
-        $ModRoot = (Resolve-Path -LiteralPath $FreeCADModDirectory).Path
-    }
-    $AddonSource = Join-Path $RepoRoot "AICopilot"
-    $RequiredAddonFiles = @(
-        "InitGui.py",
-        "socket_server.py",
-        "security_policy.py",
-        "request_validation.py",
-        "export_validation.py"
-    )
-    foreach ($RequiredFile in $RequiredAddonFiles) {
-        $SourceFile = Join-Path $AddonSource $RequiredFile
-        if (-not (Test-Path -LiteralPath $SourceFile -PathType Leaf)) {
-            throw "Required FreeCAD add-on file is missing: $SourceFile. Re-download or re-extract the complete CADPilot repository."
-        }
-    }
-
-    $AddonTarget = Join-Path $ModRoot "AICopilot"
-    New-Item -ItemType Directory -Force -Path $ModRoot | Out-Null
-
-    $Backup = $null
-    if (Test-Path -LiteralPath $AddonTarget) {
-        $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    if (Test-Path -LiteralPath $AddonTarget -PathType Container) {
+        $Stamp = Get-Date -Format "yyyyMMdd-HHmmss-fff"
         $Backup = Join-Path $ModRoot "AICopilot.backup-$Stamp"
         Write-Host "Backing up existing add-on to $Backup"
         Move-Item -LiteralPath $AddonTarget -Destination $Backup
