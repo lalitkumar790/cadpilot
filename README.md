@@ -110,7 +110,7 @@ If it still fails, report your Windows, FreeCAD, Python, and Claude Desktop vers
 
 - CADPilot is intended for one user's local computer. Do not expose its socket (`localhost:23456`) to the internet or campus network.
 - Save a copy of important CAD documents before experimenting. Some tools can modify or delete geometry.
-- Arbitrary Python execution is **disabled by default**. Do not enable it for normal coursework; it can execute code inside FreeCAD with your user permissions.
+- Arbitrary Python execution is **disabled by default at both the MCP and FreeCAD ends**. Enabling it requires `FREECAD_MCP_ENABLE_PYTHON_EXEC=1` in both process environments and restarting both applications. Do not enable it for normal coursework; it can execute code inside FreeCAD with your user permissions.
 - AI-generated geometry is not engineering certification. Check dimensions, constraints, clearances, tolerances, and manufacturability yourself.
 - Read [SECURITY.md](SECURITY.md) before use.
 
