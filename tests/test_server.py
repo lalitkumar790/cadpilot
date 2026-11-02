@@ -19,7 +19,7 @@ def test_tools_registered():
     expected = {
         "create_box", "boolean_union", "move_object",       # part.py
         "pad", "fillet", "chamfer", "hole",                 # partdesign.py
-        "capture_screenshot", "save_document", "undo",       # view.py
+        "capture_screenshot", "save_document", "undo", "diagnose_local_setup",       # view.py
         "run_python",                                        # python_exec.py
         "check_freecad_connection", "continue_selection",    # selection.py
     }
