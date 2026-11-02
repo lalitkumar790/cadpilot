@@ -475,6 +475,10 @@ class FreeCADSocketServer:
             return functools.partial(self._handle_partdesign_operations, args)
         elif tool_name == "part_operations":
             return functools.partial(self._handle_part_operations, args)
+        elif tool_name == "export_step":
+            return functools.partial(self._export_step, args)
+        elif tool_name == "export_stl":
+            return functools.partial(self._export_stl, args)
         elif tool_name == "execute_python":
             return functools.partial(self._execute_python, args)
         
@@ -2274,6 +2278,58 @@ class FreeCADSocketServer:
         except Exception as e:
             return f"Error activating workbench: {e}"
             
+    def _export_step(self, args: Dict[str, Any]) -> str:
+        """Export a named document object to STEP without arbitrary Python."""
+        import os
+        try:
+            object_name, filename = args.get("object_name"), args.get("filename")
+            if not isinstance(object_name, str) or not object_name.strip():
+                return "Error: object_name must be a non-empty string"
+            if not isinstance(filename, str) or not filename.strip():
+                return "Error: filename must be a non-empty path"
+            if os.path.splitext(filename)[1].lower() not in {".step", ".stp"}:
+                return "Error: STEP filename must end in .step or .stp"
+            path = os.path.abspath(os.path.expanduser(filename))
+            if not os.path.isdir(os.path.dirname(path)):
+                return f"Error: export directory does not exist: {os.path.dirname(path)}"
+            doc = FreeCAD.ActiveDocument
+            if not doc:
+                return "Error: no active document"
+            obj = doc.getObject(object_name)
+            if obj is None:
+                return f"Error: object not found: {object_name}"
+            import Part
+            Part.export([obj], path)
+            return json.dumps({"status": "success", "format": "STEP", "object": obj.Name, "filename": path})
+        except Exception as exc:
+            return f"Error exporting STEP: {exc}"
+
+    def _export_stl(self, args: Dict[str, Any]) -> str:
+        """Export a named document object to STL without arbitrary Python."""
+        import os
+        try:
+            object_name, filename = args.get("object_name"), args.get("filename")
+            if not isinstance(object_name, str) or not object_name.strip():
+                return "Error: object_name must be a non-empty string"
+            if not isinstance(filename, str) or not filename.strip():
+                return "Error: filename must be a non-empty path"
+            if os.path.splitext(filename)[1].lower() != ".stl":
+                return "Error: STL filename must end in .stl"
+            path = os.path.abspath(os.path.expanduser(filename))
+            if not os.path.isdir(os.path.dirname(path)):
+                return f"Error: export directory does not exist: {os.path.dirname(path)}"
+            doc = FreeCAD.ActiveDocument
+            if not doc:
+                return "Error: no active document"
+            obj = doc.getObject(object_name)
+            if obj is None:
+                return f"Error: object not found: {object_name}"
+            import Mesh
+            Mesh.export([obj], path)
+            return json.dumps({"status": "success", "format": "STL", "object": obj.Name, "filename": path})
+        except Exception as exc:
+            return f"Error exporting STL: {exc}"
+
     def _execute_python(self, args: Dict[str, Any]) -> str:
         """Execute Python code in FreeCAD context with enhanced safety and logging"""
         import traceback
