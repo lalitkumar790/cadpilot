@@ -76,3 +76,27 @@ def test_configurator_creates_config_when_missing(tmp_path):
     updated = json.loads(config_path.read_text(encoding="utf-8"))
     assert set(updated["mcpServers"]) == {"freecad"}
     assert not list(config_dir.glob("claude_desktop_config.backup-*.json"))
+
+
+def test_repeated_configuration_keeps_distinct_backups_and_no_temp_files(tmp_path):
+    original = json.dumps({"mcpServers": {"other": {"command": "node"}}})
+    result, config_path, config_dir = _run_configurator(tmp_path, original)
+    assert result.returncode == 0, result.stderr
+
+    # A second invocation backs up the first generated config rather than
+    # overwriting the first backup when both runs happen within one second.
+    appdata = config_dir.parent
+    repo_root = tmp_path / "project"
+    env = os.environ.copy()
+    env["APPDATA"] = str(appdata)
+    second = subprocess.run(
+        [sys.executable, str(SCRIPT), "--repo-root", str(repo_root)],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert second.returncode == 0, second.stderr
+    backups = list(config_dir.glob("claude_desktop_config.backup-*.json"))
+    assert len(backups) == 2
+    assert not list(config_dir.glob("claude_desktop_config.*.tmp"))
