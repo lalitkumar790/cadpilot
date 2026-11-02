@@ -73,7 +73,22 @@ class GlobalAIService:
             FreeCAD.__ai_observer = self.event_observer
             FreeCAD.Console.PrintMessage("✅ AI Event Observer started - Learning enabled\n")
         except Exception as e:
-            FreeCAD.Console.PrintError(f"❌ Event observer error: {e}\n")
+            # Observer support is optional; do not retain a partially started
+            # object or advertise it as active when registration failed.
+            if self.event_observer:
+                try:
+                    self.event_observer.stop()
+                except Exception:
+                    pass
+                self.event_observer = None
+            if hasattr(FreeCAD, "__ai_observer"):
+                try:
+                    delattr(FreeCAD, "__ai_observer")
+                except Exception:
+                    pass
+            FreeCAD.Console.PrintWarning(
+                f"Event observer unavailable; socket service remains active: {e}\\n"
+            )
             
         self.is_running = True
         FreeCAD.__ai_global_service = self
