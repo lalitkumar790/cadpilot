@@ -20,6 +20,9 @@ class FreeCADEventObserver(QtCore.QObject):
         self.current_operation_start = None
         self._started = False
         self._main_window = None
+        self._selection_observer_registered = False
+        self._document_observer_registered = False
+        self._event_filter_installed = False
         
     def start(self):
         """Start observing FreeCAD events; repeated calls are harmless."""
@@ -27,31 +30,41 @@ class FreeCADEventObserver(QtCore.QObject):
             return
         FreeCAD.Console.PrintMessage("Starting event observation...\\n")
 
-        # Register each observer once and retain the window for teardown.
-        FreeCADGui.Selection.addObserver(self)
-        FreeCAD.addDocumentObserver(self)
-        self._main_window = FreeCADGui.getMainWindow()
-        if self._main_window:
-            self._main_window.installEventFilter(self)
-        self._started = True
+        try:
+            FreeCADGui.Selection.addObserver(self)
+            self._selection_observer_registered = True
+            FreeCAD.addDocumentObserver(self)
+            self._document_observer_registered = True
+            self._main_window = FreeCADGui.getMainWindow()
+            if self._main_window:
+                self._main_window.installEventFilter(self)
+                self._event_filter_installed = True
+            self._started = True
+        except Exception:
+            # Roll back any registrations completed before a later step failed.
+            self.stop()
+            raise
 
     def stop(self):
         """Detach every FreeCAD/Qt observer; safe to call more than once."""
-        if not self._started:
-            return
-        try:
-            FreeCADGui.Selection.removeObserver(self)
-        except Exception:
-            pass
-        try:
-            FreeCAD.removeDocumentObserver(self)
-        except Exception:
-            pass
-        if self._main_window:
+        if self._selection_observer_registered:
+            try:
+                FreeCADGui.Selection.removeObserver(self)
+            except Exception:
+                pass
+            self._selection_observer_registered = False
+        if self._document_observer_registered:
+            try:
+                FreeCAD.removeDocumentObserver(self)
+            except Exception:
+                pass
+            self._document_observer_registered = False
+        if self._event_filter_installed and self._main_window:
             try:
                 self._main_window.removeEventFilter(self)
             except Exception:
                 pass
+        self._event_filter_installed = False
         self._main_window = None
         self._started = False
 
