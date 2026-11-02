@@ -22,7 +22,9 @@ In this student edition, arbitrary Python execution is disabled by default at **
 
 - The TCP listener is bound to the loopback interface (`127.0.0.1`/`localhost`) on Windows; Unix-like systems use a local domain socket.
 - The bridge sends one newline-delimited JSON request per connection. The FreeCAD listener also accepts a complete legacy JSON request without a newline during upgrades.
-- Requests and responses are limited to 8 MiB by the bridge. Socket operations use finite timeouts.
+- Requests and responses are limited to 8 MiB by the bridge and FreeCAD listener. Socket operations use finite timeouts.
+- The FreeCAD listener validates the decoded command independently: the top-level value must contain only a valid `tool` identifier and an optional object-valued `args`; nested values reject non-finite numbers, excessive nesting, oversized strings, and oversized collections.
+- These checks protect the protocol boundary; they do not authenticate local clients or make arbitrary FreeCAD operations safe.
 - The socket is still unauthenticated. Loopback binding reduces network exposure but does not protect against other processes running as the same user or malware on the machine.
 
 ## Recommendations
