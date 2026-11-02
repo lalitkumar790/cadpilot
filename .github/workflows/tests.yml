@@ -71,8 +71,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $addon, $claudeDir | Out-Null
           Set-Content -LiteralPath (Join-Path $addon "marker.txt") -Value "installed"
           Set-Content -LiteralPath $config -Value '{"mcpServers":{"freecad":{"command":"python"},"other":{"command":"node"}}}'
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall_windows.ps1
-          if ($LASTEXITCODE -ne 0) { throw "Uninstaller failed on valid config." }
+          & scripts/uninstall_windows.ps1
           if (Test-Path -LiteralPath $addon) { throw "Add-on directory remains after successful uninstall." }
           $updated = Get-Content -Raw -LiteralPath $config | ConvertFrom-Json
           if ($null -ne $updated.mcpServers.PSObject.Properties["freecad"]) { throw "freecad config entry was not removed." }
@@ -83,7 +82,13 @@ jobs:
           New-Item -ItemType Directory -Force -Path $addon | Out-Null
           Set-Content -LiteralPath (Join-Path $addon "marker.txt") -Value "still-installed"
           Set-Content -LiteralPath $config -Value '{"mcpServers":'
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall_windows.ps1
-          if ($LASTEXITCODE -eq 0) { throw "Uninstaller unexpectedly accepted malformed Claude JSON." }
+          $malformedConfigRejected = $false
+          try {
+            & scripts/uninstall_windows.ps1
+          } catch {
+            $malformedConfigRejected = $true
+            Write-Host "Expected rejection: $($_.Exception.Message)"
+          }
+          if (-not $malformedConfigRejected) { throw "Uninstaller unexpectedly accepted malformed Claude JSON." }
           if (-not (Test-Path -LiteralPath (Join-Path $addon "marker.txt"))) { throw "Add-on was changed despite malformed Claude JSON." }
           Write-Host "Windows uninstaller success and rollback checks passed."
