@@ -138,9 +138,14 @@ jobs:
           $backupsAfterSecondUpdate = @(Get-ChildItem -LiteralPath $modRoot -Directory -Filter "AICopilot.backup-*")
           if ($backupsAfterSecondUpdate.Count -ne 2) { throw "Expected two distinct backups after two updates; found $($backupsAfterSecondUpdate.Count)." }
           if (@($backupsAfterSecondUpdate.Name | Select-Object -Unique).Count -ne 2) { throw "Repeated installer runs produced colliding backup names." }
-          if (-not (Test-Path -LiteralPath (Join-Path $backupsAfterSecondUpdate[1].FullName "InitGui.py"))) {
-            $secondBackupHasInstalledFiles = @($backupsAfterSecondUpdate | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "InitGui.py") }).Count -gt 0
-            if (-not $secondBackupHasInstalledFiles) { throw "Second backup did not preserve the previously installed add-on." }
+          $installedBackups = @($backupsAfterSecondUpdate | Where-Object {
+            Test-Path -LiteralPath (Join-Path $_.FullName "InitGui.py") -PathType Leaf
+          })
+          if ($installedBackups.Count -ne 1) {
+            throw "Expected exactly one backup to contain the previously installed add-on; found $($installedBackups.Count)."
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $backupsAfterSecondUpdate.FullName "old-marker.txt") -PathType Leaf)) {
+            throw "First backup did not preserve the original add-on marker."
           }
 
           # Preflight failure: an incomplete source must be rejected before
