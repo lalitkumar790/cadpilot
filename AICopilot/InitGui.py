@@ -48,7 +48,7 @@ class GlobalAIService:
                 FreeCAD.__ai_socket_server = self.socket_server
                 FreeCAD.Console.PrintMessage("✅ AI Socket Server started - Claude Desktop ready\n")
             else:
-                FreeCAD.Console.PrintError("❌ Failed to start AI socket server\\n")
+                FreeCAD.Console.PrintError("❌ Failed to start AI socket server\n")
                 try:
                     self.socket_server.stop_server()
                 except Exception:
@@ -62,7 +62,7 @@ class GlobalAIService:
                 except Exception:
                     pass
                 self.socket_server = None
-            FreeCAD.Console.PrintError(f"❌ Socket server error: {e}\\n")
+            FreeCAD.Console.PrintError(f"❌ Socket server error: {e}\n")
             return False
             
         # Start event observer for learning
