@@ -55,7 +55,7 @@ Replace the example path with the actual `Mod` folder.
 2. Completely quit Claude Desktop from its tray/menu, then reopen it.
 3. In Claude Desktop, open its developer/MCP tools view and check that the `freecad` server is running. Menu wording can vary by version.
 4. Ask Claude: **“Call `check_freecad_connection` and tell me whether FreeCAD is connected.”**
-5. Run **`diagnose_local_setup`** to check the Python version, project files, MCP package, and live FreeCAD connection. Follow the reported next steps if a check fails.
+5. Run **`diagnose_local_setup`** to check the Python version, project files, MCP package, Claude Desktop's configured executable/arguments/project folder, and the live FreeCAD connection. The check is read-only; it does not edit your Claude config. Follow the reported next steps if a check fails.
 6. When connected, try:
 
    > Create a new box in FreeCAD with length 40 mm, width 30 mm, and height 20 mm. Name it StudentTestBox. Do not delete or overwrite existing objects.
