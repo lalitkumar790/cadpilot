@@ -152,16 +152,19 @@ def diagnose_local_setup() -> str:
         "detail": "Importable" if importlib.util.find_spec("mcp") is not None else "Not found; install CADPilot dependencies in this Python environment",
     })
 
-    connection_result = dispatch("check_freecad_connection")
+    from freecad_mcp.transport.socket_client import FreeCADConnectionError, send_command
+
     try:
-        connection = json.loads(connection_result)
-    except (TypeError, ValueError):
-        connection = {"raw": connection_result}
-    connected = bool(connection.get("connected"))
+        send_command("list_all_objects", {})
+        connected = True
+        connection_detail = "Connected to the FreeCAD AI Copilot service."
+    except FreeCADConnectionError as exc:
+        connected = False
+        connection_detail = str(exc)
     checks.append({
         "name": "FreeCAD socket connection",
         "ok": connected,
-        "detail": str(connection.get("status") or ("Connected" if connected else connection)),
+        "detail": connection_detail,
     })
 
     passed = sum(1 for item in checks if item["ok"])
