@@ -1,6 +1,7 @@
 param(
     [switch]$SkipFreeCADAddon,
     [switch]$SkipClaudeConfig,
+    [switch]$SkipPythonSetup,
     [string]$FreeCADModDirectory
 )
 
@@ -12,53 +13,59 @@ Write-Host "CADPilot - Student Setup" -ForegroundColor Cyan
 Write-Host "Project: $RepoRoot"
 Write-Host ""
 
-# Prefer the Python Launcher and select the newest supported interpreter.
-$PythonCommand = $null
-$PythonPrefixArgs = @()
-if (Get-Command py -ErrorAction SilentlyContinue) {
-    foreach ($Candidate in @("-3.13", "-3.12", "-3.11")) {
-        try {
-            & py $Candidate --version | Out-Null
-            if ($LASTEXITCODE -eq 0) {
-                $PythonCommand = "py"
-                $PythonPrefixArgs = @($Candidate)
-                break
-            }
-        } catch {}
+if (-not $SkipPythonSetup) {
+    # Claude configuration needs the project virtual environment. The skip
+    # switch is intended for isolated installer tests and pre-provisioned runs
+    # that also skip Claude configuration.
+    $PythonCommand = $null
+    $PythonPrefixArgs = @()
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        foreach ($Candidate in @("-3.13", "-3.12", "-3.11")) {
+            try {
+                & py $Candidate --version | Out-Null
+                if ($LASTEXITCODE -eq 0) {
+                    $PythonCommand = "py"
+                    $PythonPrefixArgs = @($Candidate)
+                    break
+                }
+            } catch {}
+        }
     }
-}
 
-if (-not $PythonCommand -and (Get-Command python -ErrorAction SilentlyContinue)) {
-    $PythonCommand = "python"
-}
+    if (-not $PythonCommand -and (Get-Command python -ErrorAction SilentlyContinue)) {
+        $PythonCommand = "python"
+    }
 
-if (-not $PythonCommand) {
-    throw "Python 3.11+ was not found. Install Python 3.11+ from https://www.python.org/downloads/windows/ and rerun this script."
-}
+    if (-not $PythonCommand) {
+        throw "Python 3.11+ was not found. Install Python 3.11+ from https://www.python.org/downloads/windows/ and rerun this script."
+    }
 
-$VersionText = (& $PythonCommand @PythonPrefixArgs --version 2>&1 | Out-String).Trim()
-if ($VersionText -notmatch "Python (\d+)\.(\d+)") {
-    throw "Could not determine Python version from: $VersionText"
-}
-$Major = [int]$Matches[1]
-$Minor = [int]$Matches[2]
-if (($Major -lt 3) -or (($Major -eq 3) -and ($Minor -lt 11))) {
-    throw "Found $VersionText. The MCP Python SDK v2 requires Python 3.11 or newer."
-}
-Write-Host "Using $VersionText"
+    $VersionText = (& $PythonCommand @PythonPrefixArgs --version 2>&1 | Out-String).Trim()
+    if ($VersionText -notmatch "Python (\d+)\.(\d+)") {
+        throw "Could not determine Python version from: $VersionText"
+    }
+    $Major = [int]$Matches[1]
+    $Minor = [int]$Matches[2]
+    if (($Major -lt 3) -or (($Major -eq 3) -and ($Minor -lt 11))) {
+        throw "Found $VersionText. The MCP Python SDK v2 requires Python 3.11 or newer."
+    }
+    Write-Host "Using $VersionText"
 
-$VenvPython = Join-Path $RepoRoot ".venv\Scripts\python.exe"
-if (-not (Test-Path -LiteralPath $VenvPython -PathType Leaf)) {
-    Write-Host "Creating virtual environment..."
-    & $PythonCommand @PythonPrefixArgs -m venv (Join-Path $RepoRoot ".venv")
-    if ($LASTEXITCODE -ne 0) { throw "Could not create Python virtual environment." }
-}
+    $VenvPython = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+    if (-not (Test-Path -LiteralPath $VenvPython -PathType Leaf)) {
+        Write-Host "Creating virtual environment..."
+        & $PythonCommand @PythonPrefixArgs -m venv (Join-Path $RepoRoot ".venv")
+        if ($LASTEXITCODE -ne 0) { throw "Could not create Python virtual environment." }
+    }
 
-Write-Host "Installing project and dependencies..."
-& $VenvPython -m pip install --upgrade pip
-if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed." }
-& $VenvPython -m pip install -e $RepoRoot
-if ($LASTEXITCODE -ne 0) { throw "Project installation failed." }
+    Write-Host "Installing project and dependencies..."
+    & $VenvPython -m pip install --upgrade pip
+    if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed." }
+    & $VenvPython -m pip install -e $RepoRoot
+    if ($LASTEXITCODE -ne 0) { throw "Project installation failed." }
+} elseif (-not $SkipClaudeConfig) {
+    throw "-SkipPythonSetup requires -SkipClaudeConfig because Claude configuration uses the project virtual environment."
+}
 
 if (-not $SkipFreeCADAddon) {
     if ([string]::IsNullOrWhiteSpace($FreeCADModDirectory)) {
