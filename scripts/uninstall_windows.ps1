@@ -60,7 +60,7 @@ if (Test-Path -LiteralPath $ConfigPath -PathType Leaf) {
 # Quarantine the add-on with a same-volume rename first. Unlike recursive
 # deletion, this is reversible and avoids a half-deleted add-on on failure.
 if (Test-Path -LiteralPath $AddonTarget -PathType Container) {
-    $Stamp = Get-Date -Format "yyyyMMdd-HHmmss-fff"
+    $Stamp = "{0}-{1}" -f (Get-Date -Format "yyyyMMdd-HHmmss-fff"), ([guid]::NewGuid().ToString("N"))
     $AddonQuarantinePath = Join-Path $ModRoot "AICopilot.uninstall-backup-$Stamp"
     Move-Item -LiteralPath $AddonTarget -Destination $AddonQuarantinePath
     $AddonMoved = $true
