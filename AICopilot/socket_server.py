@@ -263,7 +263,7 @@ class FreeCADSocketServer:
         # Set socket path based on platform
         if IS_WINDOWS:
             self.socket_path = "localhost:23456"
-            self.host = 'localhost'
+            self.host = '127.0.0.1'
             self.port = 23456
         else:
             self.socket_path = "/tmp/freecad_mcp.sock"
@@ -396,8 +396,13 @@ class FreeCADSocketServer:
                 response = self._process_command(command)
 
             if response:
-                client_socket.sendall((response + "\n").encode("utf-8"))
-                _log("response-sent", f"{len(response)} bytes")
+                response_bytes = response.encode("utf-8")
+                if len(response_bytes) > 8 * 1024 * 1024:
+                    response_bytes = json.dumps({
+                        "error": "Response exceeds the 8388608-byte message limit."
+                    }).encode("utf-8")
+                client_socket.sendall(response_bytes + b"\n")
+                _log("response-sent", f"{len(response_bytes)} bytes")
 
         except socket.timeout:
             _log("client-timeout", "request timed out before a complete message arrived")
