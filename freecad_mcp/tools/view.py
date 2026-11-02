@@ -126,6 +126,26 @@ def diagnose_local_setup() -> str:
               and (project_root / "AICopilot" / "socket_server.py").is_file(),
         "detail": str(project_root),
     })
+    import os
+    from freecad_mcp.diagnostics import inspect_claude_config
+
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        claude_path = Path(appdata) / "Claude" / "claude_desktop_config.json"
+        venv_python = project_root / ".venv" / "Scripts" / "python.exe"
+        claude_check = inspect_claude_config(claude_path, project_root, venv_python)
+        checks.append({
+            "name": "Claude Desktop configuration",
+            "ok": claude_check["ok"],
+            "detail": claude_check["detail"],
+        })
+    else:
+        checks.append({
+            "name": "Claude Desktop configuration",
+            "ok": False,
+            "detail": "APPDATA is not set; this diagnostic currently targets the Windows Claude Desktop setup.",
+        })
+
     checks.append({
         "name": "MCP Python package",
         "ok": importlib.util.find_spec("mcp") is not None,
