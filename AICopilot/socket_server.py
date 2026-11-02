@@ -354,29 +354,63 @@ class FreeCADSocketServer:
                 break
                 
     def _handle_client(self, client_socket):
-        """Handle individual client connections"""
+        """Handle one bounded JSON command and close the connection."""
         try:
-            while self.is_running:
-                # Receive data
-                data = client_socket.recv(4096)
+            client_socket.settimeout(30.0)
+            request = bytearray()
+
+            while True:
+                data = client_socket.recv(65536)
                 if not data:
                     break
-                    
-                # Process the command
-                response = self._process_command(data.decode('utf-8'))
-                
-                # Send response
-                if response:
-                    client_socket.send(response.encode('utf-8'))
-                    _log("response-sent", f"{len(response)} bytes")
-                    
+                request.extend(data)
+
+                if len(request) > 8 * 1024 * 1024:
+                    response = json.dumps({
+                        "error": "Request exceeds the 8388608-byte message limit."
+                    })
+                    client_socket.sendall((response + "\n").encode("utf-8"))
+                    return
+
+                # New clients use newline-delimited JSON. Accept a complete
+                # legacy JSON document without a newline during migration.
+                newline = request.find(b"\n")
+                if newline >= 0:
+                    request = request[:newline]
+                    break
+                try:
+                    json.loads(request.decode("utf-8"))
+                    break
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+
+            if not request:
+                return
+
+            try:
+                command = request.decode("utf-8")
+                json.loads(command)
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                response = json.dumps({"error": f"Invalid JSON request: {exc}"})
+            else:
+                response = self._process_command(command)
+
+            if response:
+                client_socket.sendall((response + "\n").encode("utf-8"))
+                _log("response-sent", f"{len(response)} bytes")
+
+        except socket.timeout:
+            _log("client-timeout", "request timed out before a complete message arrived")
         except Exception as e:
             FreeCAD.Console.PrintError(f"Client handler error: {e}\n")
         finally:
-            client_socket.close()
+            try:
+                client_socket.close()
+            except OSError:
+                pass
             if client_socket in self.client_connections:
                 self.client_connections.remove(client_socket)
-                
+
     def _process_command(self, command_str: str) -> str:
         """Process incoming command and return response"""
         try:
