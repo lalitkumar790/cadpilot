@@ -49,9 +49,20 @@ if (Test-Path -LiteralPath $ConfigPath -PathType Leaf) {
         throw "Claude config is not valid JSON. Nothing was uninstalled: $ConfigPath"
     }
 
-    if ($null -ne $Config -and $null -ne $Config.PSObject.Properties["mcpServers"]) {
-        $Servers = $Config.mcpServers
-        if ($null -ne $Servers -and $null -ne $Servers.PSObject.Properties["freecad"]) {
+    # Valid JSON is not necessarily a valid Claude configuration. Refuse
+    # destructive uninstall if the document or mcpServers section has the
+    # wrong shape; preserve the add-on until the user repairs the config.
+    if ($null -eq $Config -or $Config -isnot [System.Management.Automation.PSCustomObject]) {
+        throw "Claude config must contain a JSON object. Nothing was uninstalled: $ConfigPath"
+    }
+
+    $ServersProperty = $Config.PSObject.Properties["mcpServers"]
+    if ($null -ne $ServersProperty) {
+        $Servers = $ServersProperty.Value
+        if ($null -eq $Servers -or $Servers -isnot [System.Management.Automation.PSCustomObject]) {
+            throw "Claude config 'mcpServers' must be a JSON object. Nothing was uninstalled: $ConfigPath"
+        }
+        if ($null -ne $Servers.PSObject.Properties["freecad"]) {
             $RemoveConfigEntry = $true
         }
     }
