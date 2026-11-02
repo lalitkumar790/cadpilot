@@ -92,6 +92,23 @@ jobs:
           if (-not $malformedConfigRejected) { throw "Uninstaller unexpectedly accepted malformed Claude JSON." }
           if (-not (Test-Path -LiteralPath (Join-Path $addon "marker.txt"))) { throw "Add-on was changed despite malformed Claude JSON." }
 
+          # Syntactically valid JSON with an invalid Claude config shape must
+          # also fail safely before the add-on is moved.
+          foreach ($invalidConfig in @('[]', '{"mcpServers":[]}')) {
+            Set-Content -LiteralPath $config -Value $invalidConfig
+            $schemaRejected = $false
+            try {
+              & .\scripts\uninstall_windows.ps1
+            } catch {
+              $schemaRejected = $true
+              Write-Host "Expected config-schema rejection: $($_.Exception.Message)"
+            }
+            if (-not $schemaRejected) { throw "Uninstaller accepted invalid Claude config shape: $invalidConfig" }
+            if (-not (Test-Path -LiteralPath (Join-Path $addon "marker.txt"))) {
+              throw "Add-on was changed despite invalid Claude config shape: $invalidConfig"
+            }
+          }
+
           # Force the config replacement to fail after the add-on has been
           # quarantined. The exclusive file handle simulates another process
           # holding Claude's config open; the uninstaller must restore the add-on.
