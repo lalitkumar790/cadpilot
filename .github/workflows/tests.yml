@@ -92,3 +92,61 @@ jobs:
           if (-not $malformedConfigRejected) { throw "Uninstaller unexpectedly accepted malformed Claude JSON." }
           if (-not (Test-Path -LiteralPath (Join-Path $addon "marker.txt"))) { throw "Add-on was changed despite malformed Claude JSON." }
           Write-Host "Windows uninstaller success and rollback checks passed."
+
+      - name: Exercise Windows installer success and preflight rollback paths
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $testRoot = Join-Path $env:RUNNER_TEMP "cadpilot-setup-test"
+          if (Test-Path -LiteralPath $testRoot) {
+            Remove-Item -LiteralPath $testRoot -Recurse -Force
+          }
+          $project = Join-Path $testRoot "project"
+          $scripts = Join-Path $project "scripts"
+          $sourceAddon = Join-Path $project "AICopilot"
+          $modRoot = Join-Path $testRoot "FreeCAD-Mod"
+          New-Item -ItemType Directory -Force -Path $scripts, $sourceAddon, $modRoot | Out-Null
+          Copy-Item ".\\scripts\\setup_windows.ps1" (Join-Path $scripts "setup_windows.ps1")
+          $required = @(
+            "InitGui.py",
+            "socket_server.py",
+            "security_policy.py",
+            "request_validation.py",
+            "export_validation.py"
+          )
+          foreach ($file in $required) {
+            Copy-Item (Join-Path "AICopilot" $file) (Join-Path $sourceAddon $file)
+          }
+
+          # Successful update: previous add-on is backed up and all required
+          # workbench files are present in the installed copy.
+          $target = Join-Path $modRoot "AICopilot"
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          Set-Content -LiteralPath (Join-Path $target "old-marker.txt") -Value "preserve-as-backup"
+          & (Join-Path $scripts "setup_windows.ps1") -FreeCADModDirectory $modRoot -SkipPythonSetup -SkipClaudeConfig
+          if (-not (Test-Path -LiteralPath (Join-Path $target "InitGui.py") -PathType Leaf)) { throw "Installer did not copy InitGui.py." }
+          foreach ($file in $required) {
+            if (-not (Test-Path -LiteralPath (Join-Path $target $file) -PathType Leaf)) { throw "Installed add-on is missing $file." }
+          }
+          $backups = @(Get-ChildItem -LiteralPath $modRoot -Directory -Filter "AICopilot.backup-*")
+          if ($backups.Count -ne 1) { throw "Expected exactly one previous add-on backup; found $($backups.Count)." }
+          if (-not (Test-Path -LiteralPath (Join-Path $backups[0].FullName "old-marker.txt"))) { throw "Previous add-on backup did not preserve its contents." }
+
+          # Preflight failure: an incomplete source must be rejected before
+          # the currently installed add-on is moved or modified.
+          Remove-Item -LiteralPath $target -Recurse -Force
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          Set-Content -LiteralPath (Join-Path $target "live-marker.txt") -Value "must-survive"
+          Remove-Item -LiteralPath (Join-Path $sourceAddon "export_validation.py") -Force
+          $rejected = $false
+          try {
+            & (Join-Path $scripts "setup_windows.ps1") -FreeCADModDirectory $modRoot -SkipPythonSetup -SkipClaudeConfig
+          } catch {
+            $rejected = $true
+            Write-Host "Expected installer rejection: $($_.Exception.Message)"
+          }
+          if (-not $rejected) { throw "Installer accepted an incomplete add-on source." }
+          if (-not (Test-Path -LiteralPath (Join-Path $target "live-marker.txt"))) { throw "Installed add-on was modified after preflight rejection." }
+          $backupCountAfterFailure = @(Get-ChildItem -LiteralPath $modRoot -Directory -Filter "AICopilot.backup-*").Count
+          if ($backupCountAfterFailure -ne 1) { throw "Preflight failure unexpectedly changed backup state." }
+          Write-Host "Windows installer success and preflight-preservation checks passed."
