@@ -69,7 +69,7 @@ if (Test-Path -LiteralPath $AddonTarget -PathType Container) {
 
 try {
     if ($RemoveConfigEntry) {
-        $Stamp = Get-Date -Format "yyyyMMdd-HHmmss-fff"
+        $Stamp = "{0}-{1}" -f (Get-Date -Format "yyyyMMdd-HHmmss-fff"), ([guid]::NewGuid().ToString("N"))
         $ConfigBackupPath = Join-Path (Split-Path $ConfigPath) "claude_desktop_config.backup-$Stamp.json"
         $ConfigTempPath = "$ConfigPath.$Stamp.tmp"
         Copy-Item -LiteralPath $ConfigPath -Destination $ConfigBackupPath
