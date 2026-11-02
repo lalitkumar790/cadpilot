@@ -70,34 +70,53 @@ class GlobalAIService:
         return True
         
     def stop(self):
-        """Stop the global AI service"""
-        if not self.is_running:
+        """Stop the global AI service and attempt every cleanup step."""
+        if not self.is_running and not self.socket_server and not self.event_observer:
             return
-            
-        FreeCAD.Console.PrintMessage("🔄 Stopping AI Copilot Service...\n")
-        
+
+        FreeCAD.Console.PrintMessage("🔄 Stopping AI Copilot Service...\\n")
+        errors = []
+
         if self.socket_server:
-            self.socket_server.stop_server()
-            self.socket_server = None
-            
+            try:
+                self.socket_server.stop_server()
+            except Exception as e:
+                errors.append(f"Socket server shutdown error: {e}")
+            finally:
+                self.socket_server = None
+
         if self.event_observer:
             try:
                 self.event_observer.stop()
             except Exception as e:
-                FreeCAD.Console.PrintError(f"Event observer shutdown error: {e}\\n")
-            self.event_observer = None
-            
+                errors.append(f"Event observer shutdown error: {e}")
+            finally:
+                self.event_observer = None
+
         self.is_running = False
-        
-        # Clean up global references
-        if hasattr(FreeCAD, '__ai_socket_server'):
-            delattr(FreeCAD, '__ai_socket_server')
-        if hasattr(FreeCAD, '__ai_observer'):
-            delattr(FreeCAD, '__ai_observer')
-        if hasattr(FreeCAD, '__ai_global_service'):
-            delattr(FreeCAD, '__ai_global_service')
-            
-        FreeCAD.Console.PrintMessage("✅ AI Copilot Service stopped\n")
+
+        # Remove only references that still point to this service's resources.
+        for attribute, resource in (
+            ("__ai_socket_server", None),
+            ("__ai_observer", None),
+            ("__ai_global_service", self),
+        ):
+            if hasattr(FreeCAD, attribute):
+                current = getattr(FreeCAD, attribute)
+                if attribute == "__ai_global_service" and current is not self:
+                    continue
+                if attribute == "__ai_socket_server" and current is not None:
+                    continue
+                if attribute == "__ai_observer" and current is not None:
+                    continue
+                try:
+                    delattr(FreeCAD, attribute)
+                except Exception as e:
+                    errors.append(f"Could not clear {attribute}: {e}")
+
+        for error in errors:
+            FreeCAD.Console.PrintError(error + "\\n")
+        FreeCAD.Console.PrintMessage("✅ AI Copilot Service stopped\\n")
 
 # ============================================================================
 # AUTO-START: Initialize AI service when FreeCAD GUI loads
