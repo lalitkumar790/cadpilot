@@ -352,10 +352,19 @@ class FreeCADSocketServer:
             try:
                 client_socket, addr = self.server_socket.accept()
                 _log("socket-accept", f"connection from {addr}")
-                
+
+                # stop_server() may race with accept(); never register a new
+                # worker after shutdown has begun.
+                if not self.is_running:
+                    client_socket.close()
+                    break
+
                 # Handle client in separate thread
                 # Register before starting the worker to avoid a fast-client race.
                 with self._clients_lock:
+                    if not self.is_running:
+                        client_socket.close()
+                        break
                     self.client_connections.append(client_socket)
                 client_thread = threading.Thread(
                     target=self._handle_client,
