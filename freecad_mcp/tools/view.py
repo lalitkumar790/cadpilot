@@ -137,11 +137,11 @@ def diagnose_local_setup() -> str:
         connection = json.loads(connection_result)
     except (TypeError, ValueError):
         connection = {"raw": connection_result}
-    connected = not bool(connection.get("error")) and not bool(connection.get("raw"))
+    connected = bool(connection.get("connected"))
     checks.append({
         "name": "FreeCAD socket connection",
         "ok": connected,
-        "detail": "Connected" if connected else str(connection.get("error") or connection.get("raw") or connection),
+        "detail": str(connection.get("status") or ("Connected" if connected else connection)),
     })
 
     passed = sum(1 for item in checks if item["ok"])
