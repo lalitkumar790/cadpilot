@@ -113,7 +113,7 @@ if (-not $SkipFreeCADAddon) {
 
     $Backup = $null
     if (Test-Path -LiteralPath $AddonTarget -PathType Container) {
-        $Stamp = Get-Date -Format "yyyyMMdd-HHmmss-fff"
+        $Stamp = "{0}-{1}" -f (Get-Date -Format "yyyyMMdd-HHmmss-fff"), ([guid]::NewGuid().ToString("N"))
         $Backup = Join-Path $ModRoot "AICopilot.backup-$Stamp"
         Write-Host "Backing up existing add-on to $Backup"
         Move-Item -LiteralPath $AddonTarget -Destination $Backup
