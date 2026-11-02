@@ -164,7 +164,7 @@ jobs:
           $newestMod = Join-Path $freecadRoot "v1-10\\Mod"
           $olderMod = Join-Path $freecadRoot "v1-9\\Mod"
           $legacyMod = Join-Path $freecadRoot "Mod"
-          New-Item -ItemType Directory -Force -Path $olderMod, $legacyMod | Out-Null
+          New-Item -ItemType Directory -Force -Path $newestMod, $olderMod, $legacyMod | Out-Null
           New-Item -ItemType Directory -Force -Path (Join-Path $olderMod "AICopilot"), (Join-Path $legacyMod "AICopilot") | Out-Null
           Set-Content -LiteralPath (Join-Path $olderMod "AICopilot\\marker.txt") -Value "older"
           Set-Content -LiteralPath (Join-Path $legacyMod "AICopilot\\marker.txt") -Value "legacy"
