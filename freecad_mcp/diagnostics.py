@@ -46,7 +46,7 @@ def inspect_claude_config(
     try:
         command_matches = configured_command.resolve() == python_path
         cwd_matches = Path(cwd).resolve() == root
-    except (OSError, RuntimeError):
+    except (OSError, RuntimeError, ValueError):
         command_matches = cwd_matches = False
 
     if not command_matches:
