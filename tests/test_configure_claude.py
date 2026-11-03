@@ -61,7 +61,13 @@ def test_configurator_rejects_malformed_json_without_overwriting(tmp_path):
 
 
 def test_configurator_rejects_invalid_root_and_mcp_servers(tmp_path):
-    for original in ('[]', '{"mcpServers": []}'):
+    for original in (
+        '[]',
+        'null',
+        '"claude-config"',
+        '{"mcpServers": []}',
+        '{"mcpServers": null}',
+    ):
         case = tmp_path / str(len(list(tmp_path.iterdir())))
         case.mkdir()
         result, config_path, _ = _run_configurator(case, original)
