@@ -117,3 +117,26 @@ def test_missing_configured_python_fails(tmp_path):
 
     assert result["ok"] is False
     assert "does not exist" in result["detail"]
+
+def test_invalid_path_values_return_diagnostic_instead_of_raising(tmp_path):
+    root = tmp_path / "cadpilot"
+    root.mkdir()
+    python = root / ".venv" / "Scripts" / "python.exe"
+    python.parent.mkdir(parents=True)
+    python.write_text("python", encoding="utf-8")
+    config = tmp_path / "claude_desktop_config.json"
+
+    value = valid_config(python, root)
+    value["mcpServers"]["freecad"]["command"] = "bad\\x00python"
+    write_config(config, value)
+    result = inspect_claude_config(config, root, python)
+    assert result["ok"] is False
+    assert "different Python" in result["detail"]
+
+    value = valid_config(python, root)
+    value["mcpServers"]["freecad"]["cwd"] = "bad\\x00directory"
+    write_config(config, value)
+    result = inspect_claude_config(config, root, python)
+    assert result["ok"] is False
+    assert "different project folder" in result["detail"]
+
