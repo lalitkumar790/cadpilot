@@ -13,6 +13,7 @@ dev = ["pytest>=8.0"]
 
 [project.scripts]
 freecad-mcp = "freecad_mcp.main:run"
+freecad-mcp-http = "freecad_mcp.chatgpt_http:run"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
