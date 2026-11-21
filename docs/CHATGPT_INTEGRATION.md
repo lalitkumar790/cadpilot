@@ -63,11 +63,13 @@ $env:CADPILOT_MCP_HTTP_PORT = "8899"
 The MCP endpoint is **not** a normal web page. Test with an MCP client or MCP
 Inspector, not by assuming a browser GET should display a dashboard.
 
-If using the official MCP Python client (same Python environment), try:
+Run the local discovery smoke test in a **second** PowerShell window:
 
 ```powershell
-.\.venv\Scripts\python.exe -c "import asyncio; from mcp import Client; async_code='async def main():\n async with Client(\"http://127.0.0.1:8765/mcp\") as c:\n  print([t.name for t in await c.list_tools()])'; exec(async_code); asyncio.run(main())"
+.\\.venv\\Scripts\\python.exe scripts\\check_chatgpt_mcp.py
 ```
+
+This checks MCP transport/tool discovery, not FreeCAD document operations.
 
 If the server is unreachable, check the HTTP terminal logs and make sure the
 venv contains `mcp>=2,<3`.
