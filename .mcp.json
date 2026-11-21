@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "cadpilot": {
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "freecad_mcp.main"
+      ],
+      "tools": [
+        "*"
+      ]
+    }
+  }
+}
