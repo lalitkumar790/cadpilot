@@ -4,6 +4,23 @@ CADPilot connects **Claude Desktop** to **FreeCAD** through a local MCP server. 
 
 > **Target:** Windows 10/11. The maintainer has tested the integration on a Windows laptop. The included automated tests are smoke tests; every student's FreeCAD/Claude version combination may differ.
 
+## ChatGPT / GPT integration (optional)
+
+CADPilot now also has a **local Streamable HTTP MCP endpoint** to use with
+OpenAI's Secure MCP Tunnel where your ChatGPT workspace supports custom MCP
+connections. This is **additional** to the existing Claude Desktop setup.
+
+Run on the same machine as FreeCAD:
+
+```powershell
+.\\.venv\\Scripts\\python.exe -m freecad_mcp.chatgpt_http
+```
+
+Local endpoint: `http://127.0.0.1:8765/mcp`. **Never expose this
+unauthenticated endpoint to the Internet.** Follow
+[the ChatGPT integration guide](docs/CHATGPT_INTEGRATION.md) to configure an
+authenticated outbound-only tunnel and check plan/workspace permissions.
+
 ## 1. Install these three things
 
 1. **FreeCAD 1.0 or newer:** https://www.freecad.org/downloads.php
